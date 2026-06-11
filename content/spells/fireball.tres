@@ -1,0 +1,16 @@
+[gd_resource type="Resource" script_class="Spell" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://data/spell.gd" id="1"]
+[ext_resource type="PackedScene" path="res://entities/vfx/fireball_projectile.tscn" id="2"]
+
+[resource]
+script = ExtResource("1")
+id = &"fireball"
+display_name = "Fireball"
+int_requirement = 5
+base_chance = 0.5
+mp_cost = 20
+cooldown_seconds = 3.0
+range = 8.0
+damage_base = 30
+projectile_vfx = ExtResource("2")

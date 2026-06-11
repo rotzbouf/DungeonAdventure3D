@@ -1,0 +1,15 @@
+# Godot 4 editor/import artifacts
+.godot/
+.import/
+export_presets.cfg
+
+# Portable engine + DCC tooling (downloaded, not source — see .tools/README if added)
+.tools/
+
+# Raw source art (zips/.blend files) — exported game-ready assets live in
+# entities/, assets/, audio/ and are tracked normally
+MyAssets/
+
+# OS cruft
+.DS_Store
+Thumbs.db

@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="CharacterClass" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/character_class.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = &"mage"
+display_name = "Mage"
+base_stats = {
+&"max_hp": 80,
+&"max_mp": 120,
+&"intelligence": 15
+}
+starting_skill_ids = Array[StringName]([])
+level_curve_id = &"default"

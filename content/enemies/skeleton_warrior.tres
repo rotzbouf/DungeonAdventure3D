@@ -1,0 +1,17 @@
+[gd_resource type="Resource" script_class="EnemyDefinition" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://data/enemy_definition.gd" id="1"]
+[ext_resource type="PackedScene" path="res://entities/enemy/skeleton_visual.tscn" id="2"]
+
+[resource]
+script = ExtResource("1")
+id = &"skeleton_warrior"
+display_name = "Skeleton Warrior"
+max_hp = 40
+attack_damage = 8
+move_speed = 2.5
+aggro_radius = 6.0
+attack_range = 1.5
+xp_reward = 20
+loot_item_id = &"bone_shard"
+visual_scene = ExtResource("2")

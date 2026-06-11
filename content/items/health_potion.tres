@@ -1,0 +1,13 @@
+[gd_resource type="Resource" script_class="ConsumableItem" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://data/consumable_item.gd" id="1"]
+[ext_resource type="PackedScene" path="res://entities/items/potions/health_potion.tscn" id="2"]
+
+[resource]
+script = ExtResource("1")
+id = &"health_potion"
+display_name = "Health Potion"
+use_effect = {
+&"restore_hp": 40
+}
+visual_scene = ExtResource("2")

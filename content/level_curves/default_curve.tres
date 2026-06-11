@@ -1,0 +1,8 @@
+[gd_resource type="Resource" script_class="LevelCurve" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/level_curve.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = &"default"
+xp_per_level = Array[int]([100, 250, 450, 700, 1000, 1350, 1750, 2200, 2700])

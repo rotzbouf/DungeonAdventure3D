@@ -1,0 +1,224 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://ui/hud/hotbar/hotbar.gd" id="1"]
+
+[node name="Hotbar" type="Control"]
+script = ExtResource("1")
+anchor_left = 0.5
+anchor_right = 0.5
+anchor_top = 1.0
+anchor_bottom = 1.0
+offset_left = -225.0
+offset_top = -56.0
+offset_right = 225.0
+offset_bottom = -8.0
+grow_horizontal = 2
+
+[node name="Slots" type="HBoxContainer" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_constants/separation = 4
+
+[node name="Slot1" type="PanelContainer" parent="Slots"]
+layout_mode = 2
+custom_minimum_size = Vector2(40, 40)
+
+[node name="VBox" type="VBoxContainer" parent="Slots/Slot1"]
+layout_mode = 2
+
+[node name="KeyLabel" type="Label" parent="Slots/Slot1/VBox"]
+layout_mode = 2
+text = "1"
+theme_override_font_sizes/font_size = 10
+horizontal_alignment = 1
+
+[node name="SkillLabel" type="Label" parent="Slots/Slot1/VBox"]
+layout_mode = 2
+text = ""
+theme_override_font_sizes/font_size = 9
+horizontal_alignment = 1
+autowrap_mode = 2
+
+[node name="Slot2" type="PanelContainer" parent="Slots"]
+layout_mode = 2
+custom_minimum_size = Vector2(40, 40)
+
+[node name="VBox" type="VBoxContainer" parent="Slots/Slot2"]
+layout_mode = 2
+
+[node name="KeyLabel" type="Label" parent="Slots/Slot2/VBox"]
+layout_mode = 2
+text = "2"
+theme_override_font_sizes/font_size = 10
+horizontal_alignment = 1
+
+[node name="SkillLabel" type="Label" parent="Slots/Slot2/VBox"]
+layout_mode = 2
+text = ""
+theme_override_font_sizes/font_size = 9
+horizontal_alignment = 1
+autowrap_mode = 2
+
+[node name="Slot3" type="PanelContainer" parent="Slots"]
+layout_mode = 2
+custom_minimum_size = Vector2(40, 40)
+
+[node name="VBox" type="VBoxContainer" parent="Slots/Slot3"]
+layout_mode = 2
+
+[node name="KeyLabel" type="Label" parent="Slots/Slot3/VBox"]
+layout_mode = 2
+text = "3"
+theme_override_font_sizes/font_size = 10
+horizontal_alignment = 1
+
+[node name="SkillLabel" type="Label" parent="Slots/Slot3/VBox"]
+layout_mode = 2
+text = ""
+theme_override_font_sizes/font_size = 9
+horizontal_alignment = 1
+autowrap_mode = 2
+
+[node name="Slot4" type="PanelContainer" parent="Slots"]
+layout_mode = 2
+custom_minimum_size = Vector2(40, 40)
+
+[node name="VBox" type="VBoxContainer" parent="Slots/Slot4"]
+layout_mode = 2
+
+[node name="KeyLabel" type="Label" parent="Slots/Slot4/VBox"]
+layout_mode = 2
+text = "4"
+theme_override_font_sizes/font_size = 10
+horizontal_alignment = 1
+
+[node name="SkillLabel" type="Label" parent="Slots/Slot4/VBox"]
+layout_mode = 2
+text = ""
+theme_override_font_sizes/font_size = 9
+horizontal_alignment = 1
+autowrap_mode = 2
+
+[node name="Slot5" type="PanelContainer" parent="Slots"]
+layout_mode = 2
+custom_minimum_size = Vector2(40, 40)
+
+[node name="VBox" type="VBoxContainer" parent="Slots/Slot5"]
+layout_mode = 2
+
+[node name="KeyLabel" type="Label" parent="Slots/Slot5/VBox"]
+layout_mode = 2
+text = "5"
+theme_override_font_sizes/font_size = 10
+horizontal_alignment = 1
+
+[node name="SkillLabel" type="Label" parent="Slots/Slot5/VBox"]
+layout_mode = 2
+text = ""
+theme_override_font_sizes/font_size = 9
+horizontal_alignment = 1
+autowrap_mode = 2
+
+[node name="Slot6" type="PanelContainer" parent="Slots"]
+layout_mode = 2
+custom_minimum_size = Vector2(40, 40)
+
+[node name="VBox" type="VBoxContainer" parent="Slots/Slot6"]
+layout_mode = 2
+
+[node name="KeyLabel" type="Label" parent="Slots/Slot6/VBox"]
+layout_mode = 2
+text = "6"
+theme_override_font_sizes/font_size = 10
+horizontal_alignment = 1
+
+[node name="SkillLabel" type="Label" parent="Slots/Slot6/VBox"]
+layout_mode = 2
+text = ""
+theme_override_font_sizes/font_size = 9
+horizontal_alignment = 1
+autowrap_mode = 2
+
+[node name="Slot7" type="PanelContainer" parent="Slots"]
+layout_mode = 2
+custom_minimum_size = Vector2(40, 40)
+
+[node name="VBox" type="VBoxContainer" parent="Slots/Slot7"]
+layout_mode = 2
+
+[node name="KeyLabel" type="Label" parent="Slots/Slot7/VBox"]
+layout_mode = 2
+text = "7"
+theme_override_font_sizes/font_size = 10
+horizontal_alignment = 1
+
+[node name="SkillLabel" type="Label" parent="Slots/Slot7/VBox"]
+layout_mode = 2
+text = ""
+theme_override_font_sizes/font_size = 9
+horizontal_alignment = 1
+autowrap_mode = 2
+
+[node name="Slot8" type="PanelContainer" parent="Slots"]
+layout_mode = 2
+custom_minimum_size = Vector2(40, 40)
+
+[node name="VBox" type="VBoxContainer" parent="Slots/Slot8"]
+layout_mode = 2
+
+[node name="KeyLabel" type="Label" parent="Slots/Slot8/VBox"]
+layout_mode = 2
+text = "8"
+theme_override_font_sizes/font_size = 10
+horizontal_alignment = 1
+
+[node name="SkillLabel" type="Label" parent="Slots/Slot8/VBox"]
+layout_mode = 2
+text = ""
+theme_override_font_sizes/font_size = 9
+horizontal_alignment = 1
+autowrap_mode = 2
+
+[node name="Slot9" type="PanelContainer" parent="Slots"]
+layout_mode = 2
+custom_minimum_size = Vector2(40, 40)
+
+[node name="VBox" type="VBoxContainer" parent="Slots/Slot9"]
+layout_mode = 2
+
+[node name="KeyLabel" type="Label" parent="Slots/Slot9/VBox"]
+layout_mode = 2
+text = "9"
+theme_override_font_sizes/font_size = 10
+horizontal_alignment = 1
+
+[node name="SkillLabel" type="Label" parent="Slots/Slot9/VBox"]
+layout_mode = 2
+text = ""
+theme_override_font_sizes/font_size = 9
+horizontal_alignment = 1
+autowrap_mode = 2
+
+[node name="Slot10" type="PanelContainer" parent="Slots"]
+layout_mode = 2
+custom_minimum_size = Vector2(40, 40)
+
+[node name="VBox" type="VBoxContainer" parent="Slots/Slot10"]
+layout_mode = 2
+
+[node name="KeyLabel" type="Label" parent="Slots/Slot10/VBox"]
+layout_mode = 2
+text = "0"
+theme_override_font_sizes/font_size = 10
+horizontal_alignment = 1
+
+[node name="SkillLabel" type="Label" parent="Slots/Slot10/VBox"]
+layout_mode = 2
+text = ""
+theme_override_font_sizes/font_size = 9
+horizontal_alignment = 1
+autowrap_mode = 2

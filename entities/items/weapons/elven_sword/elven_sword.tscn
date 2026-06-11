@@ -1,0 +1,6 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="PackedScene" path="res://entities/items/weapons/elven_sword/elven_sword.glb" id="1"]
+
+[node name="ElvenSword" instance=ExtResource("1")]
+transform = Transform3D(0.2653, 0, 0, 0, 0.2653, 0, 0, 0, 0.2653, 0, 0, 0)

@@ -1,0 +1,7 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="PackedScene" path="res://entities/world/world.tscn" id="1"]
+
+[node name="GameRoot" type="Node"]
+
+[node name="World" parent="." instance=ExtResource("1")]

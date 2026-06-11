@@ -1,0 +1,14 @@
+[gd_resource type="Resource" script_class="Spell" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/spell.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = &"thunder_bolt"
+display_name = "Thunder Bolt"
+int_requirement = 12
+base_chance = 0.35
+mp_cost = 35
+cooldown_seconds = 5.0
+range = 10.0
+damage_base = 50

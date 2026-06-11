@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="CharacterClass" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/character_class.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = &"rogue"
+display_name = "Rogue"
+base_stats = {
+&"max_hp": 100,
+&"max_mp": 60,
+&"intelligence": 8
+}
+starting_skill_ids = Array[StringName]([&"backstab"])
+level_curve_id = &"default"

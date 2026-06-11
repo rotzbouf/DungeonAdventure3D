@@ -1,0 +1,11 @@
+[gd_resource type="Resource" script_class="EquipmentItem" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://data/equipment_item.gd" id="1"]
+[ext_resource type="PackedScene" path="res://entities/items/weapons/elven_bow/elven_bow.tscn" id="2"]
+
+[resource]
+script = ExtResource("1")
+id = &"elven_bow"
+display_name = "Elven Bow"
+slot = &"main_hand"
+visual_scene = ExtResource("2")

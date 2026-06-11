@@ -1,0 +1,13 @@
+[gd_resource type="Resource" script_class="Skill" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/skill.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = &"shield_bash"
+display_name = "Shield Bash"
+mp_cost = 10
+cooldown_seconds = 4.0
+xp_reward = 20
+range = 2.0
+damage_base = 20
