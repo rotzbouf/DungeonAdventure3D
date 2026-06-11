@@ -6,6 +6,228 @@ project uses [Semantic Versioning](https://semver.org/) (`MAJOR.MINOR.PATCH`).
 
 ## [Unreleased]
 
+## [0.16.0] - 2026-06-11
+
+### Added
+- Listen-host mode: a single process can now act as both the authoritative
+  server (peer 1) and a playable client, for singleplayer or casual
+  "host + friends connect to me" sessions -- the existing dedicated-server
+  setup is unaffected and still the recommended way to run a persistent
+  server.
+  - `bootstrap/network_mode.gd`: new `Mode.LISTEN_HOST`, selected via a
+    `--host` launch argument. `is_server()` is true for both
+    `DEDICATED_SERVER` and `LISTEN_HOST`; a new `is_dedicated_server()`
+    is true only for `DEDICATED_SERVER`; `is_client()` is true for both
+    `CLIENT` and `LISTEN_HOST`.
+  - `bootstrap/bootstrap.gd`: `--host` boots the normal client scene and
+    also starts `NetworkManager.host()`, so the host plays alongside
+    connecting clients.
+  - `run.sh`: new helper script to launch the project-local Godot binary
+    with the right arguments (`--host`, `--connect=`, `--server`,
+    `--port=`) for manual testing.
+
+### Fixed
+- A self-targeted `rpc_id(1, ...)` from peer 1 to itself (the listen host
+  issuing its own gameplay requests, e.g. character creation, movement,
+  equip, item use, skill/spell casts, shop trades, storage, chest/loot
+  pickup) hard-errored with "RPC on yourself is not allowed by selected
+  mode" under `call_remote`. All client -> server request RPCs (and their
+  targeted server -> client replies) across `world.gd`,
+  `player_input.gd`, and the player components
+  (`equipment_component.gd`, `inventory_component.gd`,
+  `skill_component.gd`, `spellbook_component.gd`, `shop_component.gd`,
+  `level_component.gd`) plus `storage_chest.gd`, `loot_drop.gd`, and
+  `chest.gd` are now declared `call_local`, which executes correctly for
+  both self-targeted and remote-targeted calls.
+- `entities/player/player.gd`: `is_owner` now also requires
+  `NetworkMode.is_client()`, so on a listen host the host's own player
+  correctly activates its camera and input (previously gated on
+  `not is_server()`, which is never true for a listen host).
+- `ui/character_creation/character_creation_screen.gd`: the listen host
+  shows the character-creation screen immediately on ready, since
+  `connected_to_server` (which drives this for regular clients) never
+  fires for the host itself.
+- Audited every remaining `is_server()`-gated presentation path (model
+  visuals, audio init/playback, animation processing, inventory/skill/
+  spell UI signals, death/boss VFX and SFX) and switched the ones that
+  mean "skip this when headless" to `is_dedicated_server()` or
+  `is_client()` as appropriate, across `model_view.gd`,
+  `audio_manager.gd`, `equipment_component.gd`,
+  `enemy_visual_animator.gd`, `enemy.gd`, `dragon.gd`,
+  `inventory_component.gd`, `skill_component.gd`, and
+  `spellbook_component.gd` -- so a listen host sees and hears its own
+  game world like any other client.
+
+## [0.15.0] - 2026-06-11
+
+### Fixed
+- `entities/player/camera_rig.gd`: the boom camera lerped toward the
+  player's position every tick, including right after a teleport (death
+  respawn or dungeon/town portal). Across the long town<->dungeon
+  distances introduced in M14, that lerp couldn't catch up fast enough and
+  the character sat outside the camera's view for a beat after
+  respawning -- looking like the character had vanished. The camera now
+  detects a per-tick jump larger than normal movement (`TELEPORT_DISTANCE`)
+  and snaps instantly instead of lerping.
+
+### Added
+- Death now drops the player's bag at the death location: `player.gd`'s
+  `_on_died()` calls a new `_drop_inventory_on_death()` which spawns a
+  `loot_drop` (via `world.spawn_loot_drop`) for each item in
+  `InventoryComponent.items` (scattered with a small random offset so
+  multiple drops don't fully overlap), then clears the inventory. Equipped
+  gear is unaffected. Combined with M14's town respawn, dying lets you walk
+  back to where you fell and pick your items back up.
+
+## [0.14.0] - 2026-06-11
+
+### Added
+- Starting town hub: a new `Town` subtree in `world.tscn`, centered at
+  (-40, 0, 0) and built from extracted Kenney fantasy-town-kit pieces
+  (`entities/town/kenney/*.glb`) -- a walled plaza with a fountain, two
+  market stalls, a "Dungeon Gate" alcove/archway, fences, trees, lanterns,
+  and reused barrel/crate clutter.
+- `entities/world/world.gd`: generalized the dungeon's `_dungeon_cells()`
+  pattern into shared `_build_navigation_mesh_for_cells()`,
+  `_build_floor_colliders_for_cells()`, and
+  `_build_wall_colliders_for_cells()` helpers. New `_town_floor_areas()` /
+  `_town_cells()` describe the plaza + gate alcove on the same 4-unit cell
+  grid (Kenney town-kit pieces scaled 4x to match), feeding a new
+  `TownNavigationRegion3D` plus `TownFloorColliders`/`TownWallColliders` --
+  the existing dungeon adjacency-based wall-gap algorithm needed zero
+  special-casing for the gate opening.
+- Gold currency: `StatsComponent.gold` (starts at 100, replicated
+  ON_CHANGE alongside hp/mp), shown on the HUD stats bar.
+- Item economy: `value: int` added to `EquipmentItem`/`ConsumableItem` and
+  set on existing items (`health_potion`=15, `sword`=50, `axe`=60,
+  `elven_dagger`=150, `elven_bow`=180, `elven_sword`=200). Buy price =
+  `value`, sell price = `value / 2`.
+- Shop system: `data/shop_definition.gd` + `GameDatabase.shops`
+  (`content/shops/{general_store,blacksmith}.tres`),
+  `entities/player/components/shop_component.gd`
+  (`request_buy_item`/`request_sell_item` RPCs with gold/inventory
+  validation and an `on_trade_rejected` reply), and
+  `ui/hud/shop/shop_panel.gd`/`.tscn`.
+- Merchant NPCs: `entities/npc/merchant/{merchant_blacksmith,
+  merchant_general_store}.tscn` (converted dwarf/wizard models) standing at
+  the two stalls; interacting opens the shop panel for that merchant's
+  stock.
+- Personal storage chest: `entities/items/storage_chest/storage_chest.gd`/
+  `.tscn`, server-only per-peer `_storage` dict (never replicated),
+  `request_open_storage`/`request_deposit_item`/`request_withdraw_item`
+  RPCs + targeted `on_storage_updated` reply, and
+  `ui/hud/storage/storage_panel.gd`/`.tscn`.
+- Dungeon <-> town teleport portals: `entities/world/area_portal.gd`/
+  `.tscn` (server-only `Area3D`, reuses `player_controller.gd.reset_to()`
+  -- the same mechanism as respawn). `PortalToDungeon` (town gate alcove ->
+  EntryRoom) and `PortalToTown` (EntryRoom -> town plaza).
+- New `TownSpawn1`/`TownSpawn2` markers inserted as `SpawnPoints[0..1]`
+  (existing dungeon spawns shift to indices 2-5). New characters and
+  post-death respawns (`get_spawn_position(0)`) now place players in the
+  town plaza; `world.gd` cycles new characters through the two town spawns
+  (`TOWN_SPAWN_COUNT`) to avoid coincident spawns.
+
+### Fixed
+- `storage_chest.gd`: `_storage.get(peer_id, [])` can't be assigned to an
+  `Array[StringName]`-typed local (the `[]` default is an untyped `Array`,
+  which fails Godot's typed-array runtime check) -- threw a script error on
+  every player's first storage interaction. Replaced with a shared
+  `_stored_items()` helper used by all three storage RPC handlers.
+
+### Verified
+- Headless server + 2 clients on localhost: both new characters spawned in
+  the town plaza at `TownSpawn1`/`TownSpawn2` (not the dungeon). Walking
+  into the Dungeon Gate alcove teleported the player to the EntryRoom
+  (`PortalToDungeon` -> the old `Spawn1` position), and walking into the
+  EntryRoom portal teleported back to `TownSpawn1` (`PortalToTown`).
+  Buying/selling at the general store and blacksmith adjusted gold
+  correctly (100 -> 85 -> 92 -> 42 across a potion buy/sell and a sword
+  purchase); an over-budget purchase was rejected with "Not enough gold"
+  and left gold/inventory unchanged. Each player's storage chest opened
+  empty, round-tripped a deposited item back to inventory, and the
+  server's `_storage` ended as `{peerA: [], peerB: [item]}` -- confirming
+  per-peer privacy. `_build_town_*` produced zero navmesh edge-error
+  warnings, and a clean dual-boot restart logged zero script
+  errors/warnings.
+
+## [0.13.0] - 2026-06-11
+
+### Added
+- Dragon boss in the Boss Chamber: `content/enemies/dragon.tres` (500 HP, 20
+  melee damage, `is_boss=true`). `EnemyDefinition` gained boss-only fields
+  (`is_boss`, `phase2_hp_ratio`, `fire_breath_damage`, `fire_breath_range`,
+  `fire_breath_cone_degrees`, `fire_breath_cooldown`), copied into
+  `enemy_stats_component.gd` like the existing stats.
+  `entities/enemy/boss/dragon.tscn` is a standalone `CharacterBody3D` (larger
+  `CapsuleShape3D`, radius 1.2 / height 5.4) with
+  `entities/enemy/boss/dragon_controller.gd` extending
+  `enemy_controller.gd`: at <= `phase2_hp_ratio` HP the dragon also fires a
+  cone fire-breath (`world.gd.apply_cone_hit`) at players within
+  `fire_breath_range`/`fire_breath_cone_degrees`, on its own cooldown, in
+  addition to its existing melee attack. `entities/enemy/boss/dragon.gd`
+  (extends `enemy.gd`) adds a broadcast `on_dragon_breath` RPC that plays the
+  attack animation, the `dragon_roar` SFX, and spawns
+  `entities/vfx/fire_breath.tscn` (a one-shot cone `GPUParticles3D` +
+  `OmniLight3D`) oriented along the dragon's facing.
+- Goblin and Zombie enemies: `content/enemies/{goblin,zombie}.tres` (goblin:
+  25 HP/4 dmg/fast skirmisher; zombie: 80 HP/10 dmg/slow brute, drops a health
+  potion). Models converted from `MyAssets/dungeon-pack1.zip` via
+  `MyAssets/scripts/convert_dungeon_pack1.py` into
+  `entities/enemy/{goblin,zombie}/{goblin,zombie}.glb`, wrapped in
+  `*_visual.tscn` instance scenes.
+- Enemy animations: new `entities/enemy/components/enemy_visual_animator.gd`
+  (`Animator` node added to `entities/enemy/enemy.tscn`) finds an
+  `AnimationPlayer` inside the enemy's instantiated visual scene and drives
+  `idle`/`walk` (looping, based on movement) plus one-shot `attack`/`death`
+  clips. `enemy.gd` gained a broadcast `on_attack_performed` RPC (called from
+  `enemy_controller.gd._process_attack` alongside existing damage
+  application) and `on_died` now tries `_animator.play_death()` before
+  falling back to the old scale-to-zero tween. Goblin, zombie, and dragon all
+  ship with idle/walk/attack/death clips; the dragon's came from actions
+  already present in its source `.blend` (no DAE retargeting needed).
+- Floor-completion flow: `entities/world/exit_portal.tscn`/`.gd` is a hidden,
+  inert swirling-vortex `Area3D` (`GPUParticles3D` + `OmniLight3D`) placed in
+  the Boss Chamber. `enemy.gd.on_died` calls the new
+  `world.gd.activate_exit_portal()` for `is_boss` enemies, making it visible
+  and (server-only) starting to listen for `body_entered`. Walking into it
+  triggers a new targeted `world.gd.on_floor_cleared(xp_reward)` RPC, bridged
+  to a `floor_cleared` signal the HUD uses to show
+  `ui/hud/floor_cleared/floor_cleared_overlay.tscn` ("Floor Cleared! +500
+  XP", fades out after a hold).
+- Boss health bar: `ui/hud/boss_health_bar/boss_health_bar.tscn`/`.gd` is a
+  top-center `TextureProgressBar` (Kenney red bar) showing "Dragon HP N / N",
+  hidden until the local player enters the new `World/BossChamberArea`
+  (`Area3D`), wired up in `hud.gd`.
+- World layout: 6 new `EnemySpawnPoints` markers (`EnemySpawn5-10`) for the 3
+  goblins (Side Room A), 2 zombies (Hub), and the dragon (Boss Chamber).
+  `world.gd`'s hardcoded skeleton-only initial spawn loop is replaced by a
+  10-entry `INITIAL_ENEMY_SPAWNS` roster (4 skeleton warriors, 3 goblins, 2
+  zombies, 1 dragon); `_spawn_enemy` instantiates
+  `entities/enemy/boss/dragon.tscn` for the dragon definition id.
+- Audio: new `dragon_roar` SFX (`audio/sfx/dragon_roar.ogg`, CC0, recorded in
+  `audio/ATTRIBUTION.md`), played on the dragon's fire-breath RPC.
+
+### Verified
+- Headless server + 1 client on localhost: `GameDatabase.enemies` has
+  `goblin`/`zombie`/`dragon`; `World/Enemies` spawned all 10
+  `INITIAL_ENEMY_SPAWNS` entries with the expected `definition_id`s
+  (`Enemy_9` = dragon, 500/500 HP). A debug area-hit dropped the dragon to
+  249/500 HP, flipping `dragon_controller._is_phase2()` to true. A subsequent
+  `apply_cone_hit` along the dragon's facing dealt the full
+  `fire_breath_damage` (15) to a player positioned in the cone, and zero
+  damage to one positioned behind it. `on_attack_performed` and
+  `on_dragon_breath` both left `current_animation == "attack"` on the
+  dragon's `AnimationPlayer`, confirming the converted dragon GLB's clip
+  naming. Killing the dragon fired `on_died`, which set `is_boss`-driven
+  `activate_exit_portal()`: the `ExitPortal` became visible, its
+  `GPUParticles3D` started emitting, and (server-only) `monitoring` turned
+  true. Walking the player into the portal delivered
+  `on_floor_cleared(500)` to that client, surfacing the "Floor Cleared!"
+  overlay text. Walking the player into/out of `BossChamberArea` toggled the
+  client's `BossHealthBar.visible` while `HpLabel` continued to reflect the
+  replicated `Dragon HP 0 / 500`. Zero script errors; only the pre-existing
+  navmesh edge-merge warning.
+
 ## [0.12.0] - 2026-06-10
 
 ### Added

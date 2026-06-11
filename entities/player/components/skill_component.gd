@@ -28,7 +28,7 @@ func initialize(class_def: CharacterClass) -> void:
 	known_skill_ids = SkillUnlockSystem.newly_unlocked_at(class_def, 1)
 
 
-@rpc("any_peer", "call_remote", "reliable")
+@rpc("any_peer", "call_local", "reliable")
 func request_use_skill(skill_id: StringName) -> void:
 	if not NetworkMode.is_server():
 		return
@@ -67,11 +67,11 @@ func request_use_skill(skill_id: StringName) -> void:
 ## M7+ will trigger an animation on the caster's model_view.
 @rpc("authority", "call_local", "reliable")
 func on_skill_cast(skill_id: StringName) -> void:
-	if not NetworkMode.is_server():
+	if NetworkMode.is_client():
 		print("[skill] %s cast %s" % [get_parent().name, skill_id])
 	skill_cast.emit(skill_id)
 
 
-@rpc("authority", "call_remote", "reliable")
+@rpc("authority", "call_local", "reliable")
 func on_skill_rejected(reason: String) -> void:
 	skill_use_rejected.emit(reason)

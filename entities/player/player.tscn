@@ -11,6 +11,7 @@
 [ext_resource type="Script" path="res://entities/player/components/skill_component.gd" id="9"]
 [ext_resource type="Script" path="res://entities/player/components/spellbook_component.gd" id="10"]
 [ext_resource type="Script" path="res://entities/player/components/inventory_component.gd" id="11"]
+[ext_resource type="Script" path="res://entities/player/components/shop_component.gd" id="12"]
 
 [sub_resource type="CapsuleShape3D" id="CapsuleShape3D_1"]
 radius = 0.4
@@ -53,6 +54,9 @@ script = ExtResource("10")
 
 [node name="InventoryComponent" type="Node" parent="."]
 script = ExtResource("11")
+
+[node name="ShopComponent" type="Node" parent="."]
+script = ExtResource("12")
 
 [node name="Input" type="Node" parent="."]
 script = ExtResource("3")

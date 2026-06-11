@@ -42,6 +42,13 @@ discarded.
 - Author: Fantozzi (submitted by qubodup)
 - License: CC0
 
+## sfx/dragon_roar.ogg
+- Source: https://opengameart.org/content/cc0-deep-monster-roar (`monster_roar.wav`)
+- Author: trazzz123
+- License: CC0
+- Notes: converted from WAV to OGG Vorbis. Played by dragon.gd's
+  on_dragon_breath RPC (fire-breath attack).
+
 ## ambient/dungeon_ambience.ogg
 - Source: https://opengameart.org/content/loopable-dungeon-ambience (`dungeon_ambient_1.ogg`)
 - Author: JaggedStone

@@ -16,10 +16,10 @@ signal item_use_rejected(reason: String)
 
 var items: Array[StringName] = []:
 	set(value):
-		if not NetworkMode.is_server() and value.size() > items.size():
+		if NetworkMode.is_client() and value.size() > items.size():
 			AudioManager.play_sfx(&"item_pickup")
 		items = value
-		if not NetworkMode.is_server():
+		if NetworkMode.is_client():
 			inventory_changed.emit(items)
 
 
@@ -31,7 +31,7 @@ func add_item(item_id: StringName) -> void:
 	items.append(item_id)
 
 
-@rpc("any_peer", "call_remote", "reliable")
+@rpc("any_peer", "call_local", "reliable")
 func request_use_item(item_id: StringName) -> void:
 	if not NetworkMode.is_server():
 		return
@@ -50,6 +50,6 @@ func request_use_item(item_id: StringName) -> void:
 	items.erase(item_id)
 
 
-@rpc("authority", "call_remote", "reliable")
+@rpc("authority", "call_local", "reliable")
 func on_item_use_rejected(reason: String) -> void:
 	item_use_rejected.emit(reason)

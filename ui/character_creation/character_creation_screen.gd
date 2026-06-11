@@ -29,6 +29,11 @@ func _ready() -> void:
 	NetworkManager.connected_to_server.connect(_on_connected_to_server, CONNECT_ONE_SHOT)
 	NetworkManager.connection_failed.connect(_on_connection_unavailable, CONNECT_ONE_SHOT)
 	NetworkManager.server_disconnected.connect(_on_connection_unavailable, CONNECT_ONE_SHOT)
+	# Listen-host: this peer IS the server, so connected_to_server (only ever
+	# emitted for peers connecting to a remote server) never fires for it —
+	# show the screen immediately instead of waiting for it.
+	if NetworkMode.mode == NetworkMode.Mode.LISTEN_HOST:
+		_on_connected_to_server()
 
 
 func _populate_options(option: OptionButton, definitions: Dictionary) -> void:

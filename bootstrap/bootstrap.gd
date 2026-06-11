@@ -6,7 +6,10 @@ extends Node
 ##
 ## CLI args (after "--", via OS.get_cmdline_user_args()):
 ##   --server            force dedicated-server mode from the client/editor binary
-##   --port=<port>       port to host on (server) or connect to (client)
+##   --host              listen-host mode: this process is both the
+##                        authoritative server AND a playable client (peer 1) —
+##                        for singleplayer or casual "one of us hosts" play
+##   --port=<port>       port to host on (server/listen-host) or connect to (client)
 ##   --connect=<ip[:port]>  address to connect to (client only)
 
 const SERVER_MAIN_SCENE := "res://net/server_main.tscn"
@@ -17,10 +20,13 @@ const DEFAULT_ADDRESS := "127.0.0.1"
 
 func _ready() -> void:
 	var args := _parse_args()
-	if NetworkMode.is_server():
-		_boot_server(args)
-	else:
-		_boot_client(args)
+	match NetworkMode.mode:
+		NetworkMode.Mode.DEDICATED_SERVER:
+			_boot_dedicated_server(args)
+		NetworkMode.Mode.LISTEN_HOST:
+			_boot_listen_host(args)
+		NetworkMode.Mode.CLIENT:
+			_boot_client(args)
 
 
 func _parse_args() -> Dictionary:
@@ -40,9 +46,18 @@ func _parse_args() -> Dictionary:
 	return result
 
 
-func _boot_server(args: Dictionary) -> void:
+func _boot_dedicated_server(args: Dictionary) -> void:
 	print("Bootstrap: booting as DEDICATED SERVER")
 	var root: Node = load(SERVER_MAIN_SCENE).instantiate()
+	get_tree().root.add_child.call_deferred(root)
+	NetworkManager.host(args.port)
+
+
+## Same root scene as a regular client (HUD, character creation, camera) —
+## this peer plays too — but hosts instead of joining.
+func _boot_listen_host(args: Dictionary) -> void:
+	print("Bootstrap: booting as LISTEN HOST")
+	var root: Node = load(CLIENT_MAIN_SCENE).instantiate()
 	get_tree().root.add_child.call_deferred(root)
 	NetworkManager.host(args.port)
 

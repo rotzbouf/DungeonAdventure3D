@@ -30,7 +30,7 @@ func initialize(_class_def: CharacterClass) -> void:
 	pass  # Spellbook starts empty regardless of class; reserved for future starter spells.
 
 
-@rpc("any_peer", "call_remote", "reliable")
+@rpc("any_peer", "call_local", "reliable")
 func request_read_scroll(spell_id: StringName) -> void:
 	if not NetworkMode.is_server():
 		return
@@ -60,7 +60,7 @@ func request_read_scroll(spell_id: StringName) -> void:
 	on_learn_result.rpc_id(sender_id, spell_id, result.success, result.roll, result.threshold, "")
 
 
-@rpc("authority", "call_remote", "reliable")
+@rpc("authority", "call_local", "reliable")
 func on_learn_result(spell_id: StringName, success: bool, roll: float, threshold: float, reason: String) -> void:
 	if success:
 		spell_learned.emit(spell_id, roll, threshold)
@@ -68,7 +68,7 @@ func on_learn_result(spell_id: StringName, success: bool, roll: float, threshold
 		spell_learn_failed.emit(spell_id, reason if reason != "" else "Learning failed.")
 
 
-@rpc("any_peer", "call_remote", "reliable")
+@rpc("any_peer", "call_local", "reliable")
 func request_cast_spell(spell_id: StringName) -> void:
 	if not NetworkMode.is_server():
 		return
@@ -109,7 +109,7 @@ func request_cast_spell(spell_id: StringName) -> void:
 
 @rpc("authority", "call_local", "reliable")
 func on_spell_cast(spell_id: StringName) -> void:
-	if not NetworkMode.is_server():
+	if NetworkMode.is_client():
 		print("[spell] %s cast %s" % [get_parent().name, spell_id])
 		_maybe_spawn_projectile_vfx(spell_id)
 	spell_cast.emit(spell_id)
@@ -150,6 +150,6 @@ func _maybe_spawn_projectile_vfx(spell_id: StringName) -> void:
 	projectile.target_position = nearest.global_position + Vector3(0, 1.0, 0)
 
 
-@rpc("authority", "call_remote", "reliable")
+@rpc("authority", "call_local", "reliable")
 func on_spell_rejected(reason: String) -> void:
 	spell_use_rejected.emit(reason)

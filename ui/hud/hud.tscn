@@ -1,4 +1,4 @@
-[gd_scene load_steps=8 format=3]
+[gd_scene load_steps=10 format=3]
 
 [ext_resource type="Script" path="res://ui/hud/hud.gd" id="1"]
 [ext_resource type="PackedScene" path="res://ui/hud/stats_bar/stats_bar.tscn" id="2"]
@@ -8,6 +8,11 @@
 [ext_resource type="PackedScene" path="res://ui/hud/travel/travel.tscn" id="6"]
 [ext_resource type="PackedScene" path="res://ui/hud/map/map.tscn" id="7"]
 [ext_resource type="Theme" path="res://ui/theme/dungeon_theme.tres" id="8"]
+[ext_resource type="PackedScene" path="res://ui/hud/boss_health_bar/boss_health_bar.tscn" id="9"]
+[ext_resource type="PackedScene" path="res://ui/hud/floor_cleared/floor_cleared_overlay.tscn" id="10"]
+[ext_resource type="PackedScene" path="res://ui/hud/death_overlay/death_overlay.tscn" id="11"]
+[ext_resource type="PackedScene" path="res://ui/hud/shop/shop_panel.tscn" id="12"]
+[ext_resource type="PackedScene" path="res://ui/hud/storage/storage_panel.tscn" id="13"]
 
 [node name="HUD" type="CanvasLayer"]
 script = ExtResource("1")
@@ -30,4 +35,19 @@ theme = ExtResource("8")
 theme = ExtResource("8")
 
 [node name="MapPanel" parent="." instance=ExtResource("7")]
+theme = ExtResource("8")
+
+[node name="BossHealthBar" parent="." instance=ExtResource("9")]
+theme = ExtResource("8")
+
+[node name="FloorClearedOverlay" parent="." instance=ExtResource("10")]
+theme = ExtResource("8")
+
+[node name="DeathOverlay" parent="." instance=ExtResource("11")]
+theme = ExtResource("8")
+
+[node name="ShopPanel" parent="." instance=ExtResource("12")]
+theme = ExtResource("8")
+
+[node name="StoragePanel" parent="." instance=ExtResource("13")]
 theme = ExtResource("8")

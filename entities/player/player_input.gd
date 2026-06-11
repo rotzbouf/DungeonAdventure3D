@@ -58,7 +58,7 @@ func _find_interactable(node: Node) -> Node:
 	return null
 
 
-@rpc("any_peer", "call_remote", "reliable")
+@rpc("any_peer", "call_local", "reliable")
 func request_move_to(destination: Vector3) -> void:
 	if not NetworkMode.is_server():
 		return

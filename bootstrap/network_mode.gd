@@ -19,6 +19,8 @@ func _enter_tree() -> void:
 		mode = Mode.DEDICATED_SERVER
 	elif "--server" in OS.get_cmdline_user_args():
 		mode = Mode.DEDICATED_SERVER
+	elif "--host" in OS.get_cmdline_user_args():
+		mode = Mode.LISTEN_HOST
 	else:
 		mode = Mode.CLIENT
 

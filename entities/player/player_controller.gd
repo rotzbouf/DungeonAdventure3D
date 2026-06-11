@@ -20,16 +20,23 @@ var move_blend: float = 0.0
 
 var _body: CharacterBody3D
 var _agent: NavigationAgent3D
+var _stats: Node
 
 
 func _ready() -> void:
 	_body = get_parent()
 	_agent = _body.get_node("NavigationAgent3D")
+	_stats = _body.get_node("StatsComponent")
 	# Only the server walks paths; clients merely render the replicated result.
 	set_physics_process(NetworkMode.is_server())
 
 
 func _physics_process(delta: float) -> void:
+	if _stats.hp <= 0:
+		_body.velocity = Vector3.ZERO
+		_body.move_and_slide()
+		move_blend = 0.0
+		return
 	if _agent.is_navigation_finished():
 		_body.velocity = Vector3.ZERO
 		_body.move_and_slide()
@@ -53,4 +60,15 @@ func _physics_process(delta: float) -> void:
 ## Entry point for validated move requests (called by player_input.gd's RPC
 ## handler after it confirms the sender owns this character).
 func move_to(destination: Vector3) -> void:
+	if _stats.hp <= 0:
+		return
 	_agent.target_position = destination
+
+
+## Called by player.gd on respawn: teleports the body to `position` and
+## clears any in-flight pathfinding so the character stands idle there
+## instead of immediately walking back toward its pre-death destination.
+func reset_to(position: Vector3) -> void:
+	_body.global_position = position
+	_body.velocity = Vector3.ZERO
+	_agent.target_position = position

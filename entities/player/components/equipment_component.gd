@@ -24,7 +24,7 @@ signal equip_rejected(reason: String)
 var equipped_slots: Dictionary[StringName, StringName] = {}:
 	set(value):
 		equipped_slots = value
-		# The server has nothing to attach a visual to (headless) and is the
+		# A dedicated server has nothing to attach a visual to (headless) and is the
 		# only place this dict is ever assigned wholesale by our own code (see
 		# request_equip, which mutates in place — `dict[key] = value` does NOT
 		# invoke this setter, only whole-property assignment does). On clients,
@@ -32,7 +32,7 @@ var equipped_slots: Dictionary[StringName, StringName] = {}:
 		# REPLICATION_MODE_ON_CHANGE updates; _attach_visual_for_slot's
 		# _attached_items idempotency check makes re-driving every entry here
 		# safe even when on_equip_changed below also fires for the same change.
-		if NetworkMode.is_server():
+		if NetworkMode.is_dedicated_server():
 			return
 		for slot in value:
 			_attach_visual_for_slot(slot, value[slot])
@@ -61,7 +61,7 @@ func _player() -> CharacterBody3D:
 ## Client -> server: "I'd like to equip this item into this slot." Declared on
 ## this node so Godot routes the call to the same node path on the server —
 ## mirrors player_input.gd.request_move_to / world.gd.request_create_character.
-@rpc("any_peer", "call_remote", "reliable")
+@rpc("any_peer", "call_local", "reliable")
 func request_equip(slot: StringName, item_id: StringName) -> void:
 	if not NetworkMode.is_server():
 		return
@@ -92,7 +92,7 @@ func on_equip_changed(slot: StringName, item_id: StringName) -> void:
 	_attach_visual_for_slot(slot, item_id)
 
 
-@rpc("authority", "call_remote", "reliable")
+@rpc("authority", "call_local", "reliable")
 func on_equip_rejected(reason: String) -> void:
 	equip_rejected.emit(reason)
 

@@ -16,3 +16,7 @@ extends Resource
 ## EquipmentItem.visual_scene (never crosses the network, re-resolved
 ## locally on every peer from the item id).
 @export var visual_scene: PackedScene
+
+## Base shop value in gold. Buy price = value; sell price = value / 2
+## (integer division), computed by shop_component.gd.
+@export var value: int = 0

@@ -1,0 +1,17 @@
+[gd_resource type="Resource" script_class="EnemyDefinition" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://data/enemy_definition.gd" id="1"]
+[ext_resource type="PackedScene" path="res://entities/enemy/goblin/goblin_visual.tscn" id="2"]
+
+[resource]
+script = ExtResource("1")
+id = &"goblin"
+display_name = "Goblin"
+max_hp = 25
+attack_damage = 4
+move_speed = 4.0
+aggro_radius = 7.0
+attack_range = 1.2
+xp_reward = 15
+loot_item_id = &""
+visual_scene = ExtResource("2")

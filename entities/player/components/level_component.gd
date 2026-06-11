@@ -71,6 +71,6 @@ func gain_xp(amount: int) -> void:
 		on_level_up.rpc_id(get_parent().owning_peer_id(), result.new_level, new_skills)
 
 
-@rpc("authority", "call_remote", "reliable")
+@rpc("authority", "call_local", "reliable")
 func on_level_up(new_level: int, new_skill_ids: Array[StringName]) -> void:
 	leveled_up.emit(new_level, new_skill_ids)

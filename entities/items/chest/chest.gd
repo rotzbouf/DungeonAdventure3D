@@ -16,7 +16,7 @@ func interact(_player: Node) -> void:
 	request_open.rpc_id(1)
 
 
-@rpc("any_peer", "call_remote", "reliable")
+@rpc("any_peer", "call_local", "reliable")
 func request_open() -> void:
 	if not NetworkMode.is_server() or _opened:
 		return

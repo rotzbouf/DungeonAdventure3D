@@ -11,3 +11,4 @@ use_effect = {
 &"restore_hp": 40
 }
 visual_scene = ExtResource("2")
+value = 15

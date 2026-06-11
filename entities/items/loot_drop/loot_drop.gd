@@ -27,7 +27,7 @@ func interact(_player: Node) -> void:
 	request_pickup.rpc_id(1)
 
 
-@rpc("any_peer", "call_remote", "reliable")
+@rpc("any_peer", "call_local", "reliable")
 func request_pickup() -> void:
 	if not NetworkMode.is_server() or _picked_up:
 		return

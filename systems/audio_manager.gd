@@ -4,12 +4,14 @@ extends Node
 ## single looping ambience track. Registered as the last autoload so every
 ## other autoload (NetworkMode in particular) is ready before _ready() runs.
 ##
-## _ready() returns early on the dedicated server, mirroring the
-## `if NetworkMode.is_server(): return` idiom used by model_view.gd and other
-## client-only nodes — the server has no AudioServer output and callers
-## (hud.gd, world.gd, etc.) call AudioManager.play_*() unconditionally from
-## client-only branches anyway, but a defensive early-return keeps a stray
-## server-side call from preloading dozens of streams for nothing.
+## _ready() returns early on a dedicated server, mirroring the
+## `if NetworkMode.is_dedicated_server(): return` idiom used by model_view.gd
+## and other client-only nodes — a headless server has no AudioServer output
+## and callers (hud.gd, world.gd, etc.) call AudioManager.play_*()
+## unconditionally from client-only branches anyway, but a defensive
+## early-return keeps a stray server-side call from preloading dozens of
+## streams for nothing. A listen-host process IS also a client and needs
+## audio, so it does not return early here.
 
 const SFX_PATHS := {
 	&"ui_click": "res://audio/sfx/ui_click.ogg",
@@ -19,6 +21,7 @@ const SFX_PATHS := {
 	&"item_pickup": "res://audio/sfx/item_pickup.ogg",
 	&"enemy_death": "res://audio/sfx/enemy_death.ogg",
 	&"footstep_stone": "res://audio/sfx/footstep_stone.ogg",
+	&"dragon_roar": "res://audio/sfx/dragon_roar.ogg",
 }
 const MUSIC_PATHS := {
 	&"dungeon_explore": "res://audio/music/dungeon_explore.ogg",
@@ -44,7 +47,7 @@ var _active_ambient_key: StringName = &""
 
 
 func _ready() -> void:
-	if NetworkMode.is_server():
+	if NetworkMode.is_dedicated_server():
 		return
 
 	for key: StringName in SFX_PATHS:

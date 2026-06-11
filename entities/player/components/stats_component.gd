@@ -12,11 +12,20 @@ extends Node
 signal hp_changed(hp: int, max_hp: int)
 signal mp_changed(mp: int, max_mp: int)
 signal intelligence_changed(value: int)
+signal gold_changed(gold: int)
+
+## Emitted when hp transitions from > 0 to <= 0 (player.gd handles the
+## server-side respawn; the HUD's death overlay listens to hp_changed
+## directly since that's already replicated to every peer).
+signal died()
 
 var hp: int = 0:
 	set(value):
+		var was_alive := hp > 0
 		hp = value
 		hp_changed.emit(hp, max_hp)
+		if was_alive and hp <= 0:
+			died.emit()
 
 var max_hp: int = 0:
 	set(value):
@@ -36,6 +45,11 @@ var intelligence: int = 0:
 		intelligence = value
 		intelligence_changed.emit(intelligence)
 
+var gold: int = 0:
+	set(value):
+		gold = value
+		gold_changed.emit(gold)
+
 
 func initialize(class_def: CharacterClass) -> void:
 	max_hp = class_def.base_stats.get(&"max_hp", 100)
@@ -43,3 +57,4 @@ func initialize(class_def: CharacterClass) -> void:
 	max_mp = class_def.base_stats.get(&"max_mp", 50)
 	mp = max_mp
 	intelligence = class_def.base_stats.get(&"intelligence", 5)
+	gold = 100

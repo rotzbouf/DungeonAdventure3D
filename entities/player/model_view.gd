@@ -3,9 +3,9 @@ extends Node3D
 ## Visual-only: instances the race's character model and blends its locomotion
 ## animation from the replicated Controller.move_blend value (a small float,
 ## not raw animation frames — jitter-resilient over the network, see
-## player_controller.gd). Never runs on the server: server is headless and is
-## a spectator of no one (player.gd._ready() leaves this node inert there by
-## simply never giving it anything to render).
+## player_controller.gd). Never runs on a dedicated server: it's headless and
+## is a spectator of no one. A listen-host process IS also a client (it
+## renders itself and every other player), so this still runs there.
 ##
 ## Race is whatever the player chose at character creation (player.gd.race_id,
 ## set deterministically by world.gd._spawn_player on every peer) — looked up
@@ -33,7 +33,7 @@ var _footstep_timer := 0.0
 
 
 func _ready() -> void:
-	if NetworkMode.is_server():
+	if NetworkMode.is_dedicated_server():
 		return
 	var race: RaceModel = GameDatabase.races.get(_race_id)
 	var visual_scene: PackedScene = race.visual_scene if race != null else null
@@ -43,6 +43,11 @@ func _ready() -> void:
 	scale = Vector3.ONE * MODEL_SCALE
 	var visual := visual_scene.instantiate()
 	add_child(visual)
+	# The source rig's rest pose faces +Z, but player_controller.gd's
+	# Basis.looking_at(direction, UP) points the body's -Z at the movement
+	# direction (the convention apply_cone_hit/dragon.gd's "forward" also
+	# use) — without this flip the model walks/faces backwards.
+	visual.rotation.y = PI
 
 	_animation_tree = AnimationTree.new()
 	_animation_tree.name = "AnimationTree"

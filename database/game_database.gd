@@ -13,6 +13,7 @@ var spells: Dictionary = {}
 var items: Dictionary = {}
 var level_curves: Dictionary = {}
 var enemies: Dictionary = {}
+var shops: Dictionary = {}
 
 const CATEGORY_DIRS := {
 	"races": "res://content/races",
@@ -22,6 +23,7 @@ const CATEGORY_DIRS := {
 	"items": "res://content/items",
 	"level_curves": "res://content/level_curves",
 	"enemies": "res://content/enemies",
+	"shops": "res://content/shops",
 }
 
 
@@ -37,7 +39,8 @@ func reload() -> void:
 	items = _load_category("items")
 	level_curves = _load_category("level_curves")
 	enemies = _load_category("enemies")
-	var total := races.size() + classes.size() + skills.size() + spells.size() + items.size() + level_curves.size() + enemies.size()
+	shops = _load_category("shops")
+	var total := races.size() + classes.size() + skills.size() + spells.size() + items.size() + level_curves.size() + enemies.size() + shops.size()
 	print("GameDatabase: loaded %d content resources" % total)
 
 

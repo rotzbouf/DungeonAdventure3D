@@ -18,6 +18,7 @@ const DamageLabelFont := preload("res://assets/fonts/Cinzel-Variable.ttf")
 @onready var _health: Node = $HealthComponent
 @onready var _stats: Node = $StatsComponent
 @onready var _model: Node3D = $Model
+@onready var _animator: Node = $Animator
 
 
 func _enter_tree() -> void:
@@ -39,7 +40,9 @@ func _ready() -> void:
 	_health.hit.connect(_on_health_hit)
 
 	if def.visual_scene != null:
-		_model.add_child(def.visual_scene.instantiate())
+		var visual := def.visual_scene.instantiate() as Node3D
+		_model.add_child(visual)
+		_animator.setup(visual)
 
 
 func _on_health_depleted() -> void:
@@ -62,18 +65,29 @@ func on_enemy_hit(amount: int) -> void:
 	_spawn_damage_label(amount)
 
 
-## Broadcast (call_local) so every peer plays the death visual; the server
-## additionally awards XP, drops loot, and removes the node shortly after —
-## which MultiplayerSpawner replicates as a despawn to every client.
+## Broadcast (call_local) so every peer plays the attack/breath animation;
+## purely cosmetic, the server has already applied any resulting damage.
+@rpc("authority", "call_local", "reliable")
+func on_attack_performed() -> void:
+	_animator.play_attack()
+
+
+## Broadcast (call_local) so every peer plays the death animation/visual; the
+## server additionally awards XP, drops loot, and removes the node shortly
+## after — which MultiplayerSpawner replicates as a despawn to every client.
 @rpc("authority", "call_local", "reliable")
 func on_died() -> void:
 	_controller.set_physics_process(false)
-	_play_death_visual()
-	if not NetworkMode.is_server():
+	var def: EnemyDefinition = GameDatabase.enemies.get(definition_id)
+	if not _animator.play_death():
+		_play_death_visual()
+	if NetworkMode.is_client():
 		AudioManager.play_sfx(&"enemy_death")
 		_spawn_death_burst()
+	if def != null and def.is_boss:
+		var world := get_tree().root.find_child("World", true, false)
+		world.activate_exit_portal()
 	if NetworkMode.is_server():
-		var def: EnemyDefinition = GameDatabase.enemies.get(definition_id)
 		if def != null:
 			_award_kill_xp(def.xp_reward)
 			if def.loot_item_id != &"":

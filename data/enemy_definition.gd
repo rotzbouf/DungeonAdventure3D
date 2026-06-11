@@ -13,3 +13,12 @@ extends Resource
 ## against an item content table; M9 just prints it on pickup).
 @export var loot_item_id: StringName = &""
 @export var visual_scene: PackedScene
+
+## Boss-only fields (M13). Inert defaults for non-boss enemies — only
+## dragon.tres sets these to non-default values.
+@export var is_boss: bool = false
+@export var phase2_hp_ratio: float = 0.5
+@export var fire_breath_damage: int = 0
+@export var fire_breath_range: float = 6.0
+@export var fire_breath_cone_degrees: float = 60.0
+@export var fire_breath_cooldown: float = 4.0

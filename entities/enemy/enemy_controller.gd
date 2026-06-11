@@ -129,6 +129,7 @@ func _process_attack(delta: float) -> void:
 		if target_stats != null:
 			var damage := CombatSystem.compute_damage(_stats.attack_damage)
 			target_stats.hp = maxi(0, target_stats.hp - damage)
+		_body.on_attack_performed.rpc()
 
 
 func _move_towards(next_point: Vector3, delta: float) -> void:
@@ -169,8 +170,12 @@ func _find_nearest_player_within(radius: float) -> CharacterBody3D:
 	return nearest
 
 
-func _is_player_valid(player: CharacterBody3D) -> bool:
-	if player == null or not is_instance_valid(player):
+## Untyped parameter: _target_player can be a reference to a freed node (e.g.
+## a player who disconnected) by the time this runs, and passing a freed
+## object to a CharacterBody3D-typed parameter raises a script error on the
+## type check itself, before is_instance_valid() can even run.
+func _is_player_valid(player) -> bool:
+	if not is_instance_valid(player):
 		return false
 	var stats: Node = player.get_node_or_null("StatsComponent")
 	return stats == null or stats.hp > 0

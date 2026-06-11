@@ -8,10 +8,16 @@ extends Node3D
 const BOOM_OFFSET := Vector3(0.0, 12.0, 9.0)
 const FOLLOW_LERP_SPEED := 6.0
 
+# Per-physics-tick target movement above this is a teleport (death respawn,
+# portal use), not normal locomotion (SPEED = 4.0 units/sec) — snap instantly
+# instead of lerping, so the character doesn't sit out of frame for a beat.
+const TELEPORT_DISTANCE := 1.0
+
 @onready var _camera: Camera3D = $Camera3D
 
 var _target: Node3D
 var _active: bool = false
+var _last_target_position: Vector3
 
 
 func _ready() -> void:
@@ -29,9 +35,15 @@ func set_active(value: bool) -> void:
 
 
 func _physics_process(delta: float) -> void:
-	var desired := _target.global_position + BOOM_OFFSET
+	# Translation only — rotation is fixed (set once in _snap_to_target), so
+	# the camera never re-aims/turns while following the target.
+	var target_position := _target.global_position
+	if target_position.distance_to(_last_target_position) > TELEPORT_DISTANCE:
+		_snap_to_target()
+		return
+	var desired := target_position + BOOM_OFFSET
 	global_position = global_position.lerp(desired, 1.0 - exp(-FOLLOW_LERP_SPEED * delta))
-	look_at(_target.global_position, Vector3.UP)
+	_last_target_position = target_position
 
 
 func _snap_to_target() -> void:
@@ -39,3 +51,4 @@ func _snap_to_target() -> void:
 		return
 	global_position = _target.global_position + BOOM_OFFSET
 	look_at(_target.global_position, Vector3.UP)
+	_last_target_position = _target.global_position

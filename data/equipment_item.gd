@@ -20,3 +20,7 @@ extends Resource
 @export var slot: StringName = &""
 
 @export var visual_scene: PackedScene
+
+## Base shop value in gold. Buy price = value; sell price = value / 2
+## (integer division), computed by shop_component.gd.
+@export var value: int = 0

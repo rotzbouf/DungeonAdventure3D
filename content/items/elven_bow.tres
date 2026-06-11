@@ -9,3 +9,4 @@ id = &"elven_bow"
 display_name = "Elven Bow"
 slot = &"main_hand"
 visual_scene = ExtResource("2")
+value = 180
