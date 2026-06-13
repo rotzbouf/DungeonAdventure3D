@@ -102,7 +102,12 @@ func request_cast_spell(spell_id: StringName) -> void:
 
 	if spell.damage_base > 0:
 		var world := get_tree().root.find_child("World", true, false)
-		world.apply_area_hit(player.global_position, spell.range, CombatSystem.compute_damage(spell.damage_base), sender_id)
+		# Spells scale with INT (not weapon damage) — keeps the mage fantasy
+		# distinct from gear-driven melee; crit chance still comes from gear.
+		var int_bonus: int = (stats.intelligence / 2) if stats != null else 0
+		var equipment: Node = player.get_node_or_null("EquipmentComponent")
+		var crit_chance: float = equipment.total_crit_chance() if equipment != null else CombatSystem.BASE_CRIT_CHANCE
+		world.apply_area_hit(player.global_position, spell.range, spell.damage_base, int_bonus, crit_chance, sender_id)
 
 	on_spell_cast.rpc(spell_id)
 

@@ -3,6 +3,7 @@
 [ext_resource type="Texture2D" path="res://entities/dungeon/props/PropSet_BASE COLOR_Prop.png" id="1_mu8to"]
 [ext_resource type="Texture2D" path="res://entities/dungeon/props/PropSet_METALLIC_Prop-ROUGHNESS_Prop.png" id="2_mrpcm"]
 [ext_resource type="Texture2D" path="res://entities/dungeon/props/PropSet_NORMAL_Prop.png" id="3_pekh0"]
+[ext_resource type="PackedScene" path="res://entities/dungeon/props/flame_light.tscn" id="4_flame"]
 
 [sub_resource type="StandardMaterial3D" id="StandardMaterial3D_8rpje"]
 resource_name = "PropsMaterial"
@@ -52,3 +53,6 @@ shadow_mesh = SubResource("ArrayMesh_fd2u3")
 
 [node name="Prop_Torch" type="MeshInstance3D" unique_id=1704652471]
 mesh = SubResource("ArrayMesh_3oq7o")
+
+[node name="FlameLight" parent="." instance=ExtResource("4_flame")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.55, 0)

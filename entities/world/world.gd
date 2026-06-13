@@ -69,6 +69,15 @@ const INITIAL_ENEMY_SPAWNS: Array[StringName] = [
 
 var _loot_counter: int = 0
 
+## Server-only RNG for area/cone damage rolls (CombatSystem.compute_hit) —
+## mirrors enemy_controller.gd's _rng. Never used client-side; clients only
+## see rolled results via broadcast damage events.
+var _combat_rng := RandomNumberGenerator.new()
+
+
+func _enter_tree() -> void:
+	_combat_rng.randomize()
+
 
 func _ready() -> void:
 	_navigation_region.navigation_mesh = _build_dungeon_navigation_mesh()
@@ -225,9 +234,12 @@ func _spawn_loot(data: Dictionary) -> Node:
 
 ## Server-side area damage applied after a skill/spell cast
 ## (skill_component.gd / spellbook_component.gd) — every enemy within `range`
-## of `origin` takes `damage`, attributed to `attacker_peer_id` for the XP
+## of `origin` takes a CombatSystem.compute_hit roll (rolled PER TARGET, since
+## armor differs per enemy), attributed to `attacker_peer_id` for the XP
 ## award on death (see enemy.gd._award_kill_xp).
-func apply_area_hit(origin: Vector3, range: float, damage: int, attacker_peer_id: int) -> void:
+func apply_area_hit(origin: Vector3, range: float, base_damage: int, attack_bonus: int,
+		crit_chance: float, attacker_peer_id: int, status_id := &"",
+		status_duration := 0.0, status_magnitude := 0.0) -> void:
 	if not NetworkMode.is_server():
 		return
 	for child in _enemies_root.get_children():
@@ -236,16 +248,25 @@ func apply_area_hit(origin: Vector3, range: float, damage: int, attacker_peer_id
 			continue
 		if enemy.global_position.distance_to(origin) <= range:
 			var health: Node = enemy.get_node_or_null("HealthComponent")
+			var stats: Node = enemy.get_node_or_null("StatsComponent")
 			if health != null:
-				health.apply_damage(damage, attacker_peer_id)
+				var armor: int = stats.armor if stats != null else 0
+				var hit := CombatSystem.compute_hit(base_damage, attack_bonus, armor, crit_chance, _combat_rng)
+				health.apply_damage(hit.amount, attacker_peer_id, hit.is_crit)
+				if status_id != &"":
+					var status: Node = enemy.get_node_or_null("StatusEffectComponent")
+					if status != null:
+						status.apply_effect(status_id, status_duration, status_magnitude, attacker_peer_id)
 
 
 ## Server-side cone damage applied by dragon_controller.gd's fire-breath
 ## attack — every player within `range` of `origin` and within
-## `cone_degrees / 2` of `forward` takes `damage` directly. Mirrors
-## apply_area_hit's single-target damage application; player-death handling
-## is out of scope here, matching that existing code.
-func apply_cone_hit(origin: Vector3, forward: Vector3, range: float, cone_degrees: float, damage: int) -> void:
+## `cone_degrees / 2` of `forward` takes a CombatSystem.compute_hit roll
+## (rolled per target: armor differs per player), shown as &"burn" damage,
+## plus an optional burn DoT (status_effect_component.gd) when
+## `burn_duration` > 0.
+func apply_cone_hit(origin: Vector3, forward: Vector3, range: float, cone_degrees: float,
+		base_damage: int, burn_duration := 0.0, burn_magnitude := 0.0) -> void:
 	if not NetworkMode.is_server():
 		return
 	var half_angle := deg_to_rad(cone_degrees / 2.0)
@@ -260,7 +281,14 @@ func apply_cone_hit(origin: Vector3, forward: Vector3, range: float, cone_degree
 			continue
 		var stats: Node = player.get_node_or_null("StatsComponent")
 		if stats != null:
-			stats.hp = maxi(0, stats.hp - damage)
+			var equipment: Node = player.get_node_or_null("EquipmentComponent")
+			var armor: int = equipment.total_armor() if equipment != null else 0
+			var hit := CombatSystem.compute_hit(base_damage, 0, armor, 0.0, _combat_rng)
+			stats.apply_damage(hit.amount, hit.is_crit, &"burn")
+			if burn_duration > 0.0:
+				var status: Node = player.get_node_or_null("StatusEffectComponent")
+				if status != null:
+					status.apply_effect(&"burn", burn_duration, burn_magnitude)
 
 
 ## Server-only: drop a pickup at `drop_position`, replicated to every peer via

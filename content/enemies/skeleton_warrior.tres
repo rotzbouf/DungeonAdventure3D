@@ -15,3 +15,4 @@ attack_range = 1.5
 xp_reward = 20
 loot_item_id = &"bone_shard"
 visual_scene = ExtResource("2")
+armor = 5

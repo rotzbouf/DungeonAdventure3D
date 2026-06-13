@@ -1,4 +1,4 @@
-[gd_scene load_steps=13 format=3]
+[gd_scene load_steps=14 format=3]
 
 [ext_resource type="Script" path="res://entities/player/player.gd" id="1"]
 [ext_resource type="Script" path="res://entities/player/player_controller.gd" id="2"]
@@ -12,6 +12,7 @@
 [ext_resource type="Script" path="res://entities/player/components/spellbook_component.gd" id="10"]
 [ext_resource type="Script" path="res://entities/player/components/inventory_component.gd" id="11"]
 [ext_resource type="Script" path="res://entities/player/components/shop_component.gd" id="12"]
+[ext_resource type="Script" path="res://entities/components/status_effect_component.gd" id="13"]
 
 [sub_resource type="CapsuleShape3D" id="CapsuleShape3D_1"]
 radius = 0.4
@@ -57,6 +58,9 @@ script = ExtResource("11")
 
 [node name="ShopComponent" type="Node" parent="."]
 script = ExtResource("12")
+
+[node name="StatusEffectComponent" type="Node" parent="."]
+script = ExtResource("13")
 
 [node name="Input" type="Node" parent="."]
 script = ExtResource("3")

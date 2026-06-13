@@ -43,7 +43,26 @@ func _handle_click(screen_position: Vector2) -> void:
 	if interactable != null:
 		interactable.interact(get_parent())
 		return
+	var enemy := _find_enemy(result.collider)
+	if enemy != null:
+		# Cross-peer currency is the node NAME (Enemy_<n>), never a node
+		# reference — same convention as Player_<peer_id> everywhere else.
+		request_attack_target.rpc_id(1, enemy.name)
+		return
 	request_move_to.rpc_id(1, result.position)
+
+
+## Returns the clicked enemy body (the CharacterBody3D living under the
+## world's Enemies root) at or above `node`, or null. Walks up because the
+## ray may hit the enemy's CollisionShape3D-owning body directly or a child.
+func _find_enemy(node: Node) -> Node:
+	var current := node
+	while current != null:
+		if current is CharacterBody3D and current.get_parent() != null \
+				and current.get_parent().name == "Enemies":
+			return current
+		current = current.get_parent()
+	return null
 
 
 ## Returns the interactable node at or above `node` (self or parent), or null.
@@ -71,3 +90,22 @@ func request_move_to(destination: Vector3) -> void:
 	#      4. replication is implicit: the controller mutates authoritative
 	#      position, MultiplayerSynchronizer carries the result to every peer.
 	get_parent().get_node("Controller").move_to(destination)
+
+
+## Client -> server: "attack this enemy" (M15 basic attack). Same routing and
+## sender-verification shape as request_move_to above; the controller then
+## owns the pursue-and-swing loop server-side.
+@rpc("any_peer", "call_local", "reliable")
+func request_attack_target(enemy_name: StringName) -> void:
+	if not NetworkMode.is_server():
+		return
+	if multiplayer.get_remote_sender_id() != get_multiplayer_authority():
+		push_warning("player_input: rejected attack request from non-owning peer %d" % multiplayer.get_remote_sender_id())
+		return
+	var enemies_root := get_tree().root.find_child("Enemies", true, false)
+	if enemies_root == null:
+		return
+	var enemy := enemies_root.get_node_or_null(String(enemy_name))
+	if enemy == null:
+		return
+	get_parent().get_node("Controller").attack_target(enemy)

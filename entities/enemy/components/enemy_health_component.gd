@@ -7,7 +7,7 @@ extends Node
 
 signal hp_changed(hp: int, max_hp: int)
 signal died()
-signal hit(amount: int)
+signal hit(amount: int, is_crit: bool, damage_type: StringName, attacker_peer_id: int)
 
 var hp: int = 0:
 	set(value):
@@ -32,11 +32,11 @@ func initialize(def: EnemyDefinition) -> void:
 	hp = max_hp
 
 
-func apply_damage(amount: int, attacker_peer_id: int = -1) -> void:
+func apply_damage(amount: int, attacker_peer_id: int = -1, is_crit := false, damage_type := &"physical") -> void:
 	if not NetworkMode.is_server():
 		return
 	if attacker_peer_id >= 0:
 		last_attacker_peer_id = attacker_peer_id
 	if amount > 0 and hp > 0:
-		hit.emit(amount)
+		hit.emit(amount, is_crit, damage_type, attacker_peer_id)
 	hp = maxi(0, hp - amount)

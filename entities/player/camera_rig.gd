@@ -19,9 +19,22 @@ var _target: Node3D
 var _active: bool = false
 var _last_target_position: Vector3
 
+# Camera shake (M15): decaying random offset applied to the Camera3D child's
+# local position — NOT this rig's global position, so it can never fight the
+# follow-lerp/teleport-snap logic above.
+var _shake_strength: float = 0.0
+var _shake_time_left: float = 0.0
+var _shake_duration: float = 0.0
+
 
 func _ready() -> void:
 	_target = get_parent()
+	# The rig is a child of the player body, which yaws toward its movement
+	# direction (player_controller's slerp) — without top_level the rig
+	# inherits that yaw and the "fixed-angle" camera silently turns with the
+	# character (M15 fix; all positioning below is global, so nothing else
+	# changes).
+	top_level = true
 	_camera.current = false
 	_snap_to_target()
 
@@ -44,6 +57,31 @@ func _physics_process(delta: float) -> void:
 	var desired := target_position + BOOM_OFFSET
 	global_position = global_position.lerp(desired, 1.0 - exp(-FOLLOW_LERP_SPEED * delta))
 	_last_target_position = target_position
+	_apply_shake(delta)
+
+
+## LOCAL-ONLY game feel: never replicated, never called on inactive rigs
+## (the callers check the rig belongs to the local player first). Safe to
+## call while inactive — _physics_process is off then, so it just no-ops.
+func shake(strength := 0.15, duration := 0.2) -> void:
+	_shake_strength = strength
+	_shake_duration = duration
+	_shake_time_left = duration
+
+
+func _apply_shake(delta: float) -> void:
+	if _shake_time_left <= 0.0:
+		if _camera.position != Vector3.ZERO:
+			_camera.position = Vector3.ZERO
+		return
+	_shake_time_left = maxf(0.0, _shake_time_left - delta)
+	var falloff := _shake_time_left / _shake_duration
+	var amplitude := _shake_strength * falloff
+	_camera.position = Vector3(
+		randf_range(-amplitude, amplitude),
+		randf_range(-amplitude, amplitude),
+		0.0,
+	)
 
 
 func _snap_to_target() -> void:

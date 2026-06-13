@@ -62,14 +62,15 @@ func _process_attack(delta: float) -> void:
 
 	if dist <= _stats.attack_range:
 		if _attack_timer <= 0.0:
-			_attack_timer = ATTACK_COOLDOWN
-			var target_stats: Node = _target_player.get_node_or_null("StatsComponent")
-			if target_stats != null:
-				var damage := CombatSystem.compute_damage(_stats.attack_damage)
-				target_stats.hp = maxi(0, target_stats.hp - damage)
+			_attack_timer = _stats.attack_interval
+			_strike_target()
 			_body.on_attack_performed.rpc()
 	elif _is_phase2() and dist <= _stats.fire_breath_range and _breath_timer <= 0.0:
 		_breath_timer = _stats.fire_breath_cooldown
 		var forward := -_body.global_transform.basis.z
-		_world.apply_cone_hit(_body.global_position, forward, _stats.fire_breath_range, _stats.fire_breath_cone_degrees, _stats.fire_breath_damage)
+		# Breath also applies the dragon's authored status proc (burn) as a DoT
+		# on every player caught in the cone — see world.apply_cone_hit.
+		_world.apply_cone_hit(_body.global_position, forward, _stats.fire_breath_range,
+				_stats.fire_breath_cone_degrees, _stats.fire_breath_damage,
+				_stats.inflict_status_duration, _stats.inflict_status_magnitude)
 		_body.on_dragon_breath.rpc()

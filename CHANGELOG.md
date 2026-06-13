@@ -6,6 +6,98 @@ project uses [Semantic Versioning](https://semver.org/) (`MAJOR.MINOR.PATCH`).
 
 ## [Unreleased]
 
+## [0.17.0] - 2026-06-13
+
+M15 "Combat & Game Feel": turns the 10-line damage stub into a real combat
+system (armor/crit/variance, weapon stats, a click-to-attack basic attack,
+and status effects), adds the game-feel layer that was missing (floating
+damage numbers for players too, weapon-swing animation, camera shake), and
+gives the dungeon an actual atmosphere (a `WorldEnvironment` with fog/glow,
+flickering torch lights, per-area lighting presets).
+
+### Added
+- Real damage resolution. `systems/combat_system.gd`'s `compute_damage`
+  passthrough is replaced by `compute_hit(base, attack_bonus, armor,
+  crit_chance, rng) -> {amount, is_crit}`: ±15% variance, a 2x crit roll
+  (5% base + gear/enemy bonuses), and flat armor mitigation clamped so a
+  connecting hit always lands ≥1. All rolls are server-side; clients only
+  ever see the broadcast result.
+- Equipment combat stats. `data/equipment_item.gd` gains `attack_damage`,
+  `attack_interval`, `attack_range`, `armor`, `crit_chance_bonus`, and a
+  `rarity` tier (all inert defaults so old `.tres` load unchanged).
+  `equipment_component.gd` exposes server-side aggregation helpers
+  (`weapon_*`, `total_attack_bonus/armor/crit_chance`) read from the
+  already-replicated `equipped_slots`. Weapons are now differentiated:
+  dagger fast/low/high-crit, axe slow/heavy, swords balanced, bow long-range.
+- Basic attack. Clicking an enemy (`player_input.gd` ->
+  `request_attack_target` RPC, enemy addressed by node name) makes the
+  server-authoritative `player_controller.gd` pursue and auto-attack on the
+  equipped weapon's interval — a miniature of the enemy AGGRO->ATTACK loop;
+  clicking the ground disengages. Each swing plays a procedural weapon
+  tween on the `main_hand` bone (`equipment_component.play_swing_tween`) plus
+  the existing `sword_swing` SFX, broadcast via `player.on_attack_performed`.
+- Status effects. New shared `entities/components/status_effect_component.gd`
+  (on players, enemies, and the dragon) implements `poison`, `burn`, `slow`,
+  and `stun`, server-authoritative with DoT routed through the normal damage
+  path (so ticks broadcast their own numbers and keep kill-XP attribution).
+  Active effect ids replicate (`active_effects`, ON_CHANGE + spawn) for the
+  HUD. Enemies inflict them via new `EnemyDefinition` fields and `shield_bash`
+  now stuns; movement/attacks honor `slow`/`stun`.
+- Enemy combat variety, content-only (no new models): goblins attack fast
+  and crit, skeletons have armor, zombies inflict poison, the dragon's breath
+  applies burn.
+- Floating damage numbers and hit feedback for everyone. The enemy-only
+  damage label / hit flash are extracted into reusable
+  `entities/vfx/damage_number.gd` and `entities/vfx/hit_flash.gd`, now driven
+  for players too (`player.on_player_hit` broadcast). Numbers are colored by
+  type (physical/poison/burn/heal) and enlarged + gold on crits.
+- Camera shake (`camera_rig.shake`): a local-only decaying offset on the
+  Camera3D, triggered when the local player is hit (stronger on crits) and
+  when they land a crit. Never replicated.
+- Dungeon atmosphere. `world.tscn` gains a `WorldEnvironment` (dark ambient,
+  ACES tonemap, glow/bloom, depth fog). New
+  `entities/world/environment_controller.gd` (client-only) crossfades between
+  a dark/foggy dungeon preset and a brighter/warmer town preset based on the
+  local player's position, also tuning the lone `DirectionalLight3D`.
+- Torch/brazier/candle lights. These props were bare meshes; they now carry a
+  warm `OmniLight3D` (no shadows, distance-faded) with `flicker_light.gd`
+  sine-flicker (client-only, deliberately unsynced) plus ember particles on
+  torches/braziers. Shared `flame_light*.tscn` wrappers.
+- Item rarity colors (groundwork). `data/rarity.gd` color map, applied to item
+  names in the inventory and shop lists. Mechanically inert until M16.
+
+### Fixed
+- `entities/enemy/enemy.gd`: `on_enemy_hit` early-returned on `is_server()`,
+  so on a **listen host** (where `is_server()` is true) the host never saw
+  enemy hit flashes or damage numbers. Now `is_dedicated_server()` — the same
+  listen-host presentation-gating class as the v0.16.0 audit.
+- `ui/hud/hud.gd`: the HUD waited for `connected_to_server`, which never fires
+  for the listen host itself, so the host's own HUD never populated. It now
+  starts searching immediately in `LISTEN_HOST` mode (mirrors the
+  character-creation screen's existing special case).
+- `entities/player/camera_rig.gd`: the rig is a child of the player body and
+  silently inherited the body's movement-driven yaw, so the "fixed-angle"
+  camera turned with the character. Set `top_level = true` (all rig
+  positioning is already in global space).
+
+### Verified
+- Listen host (`./run.sh --host`): created a Mage, walked town -> dungeon
+  through the gate portal; confirmed the environment crossfades dark on entry
+  and the dungeon reads as warm flickering torch-pools over dark-blue
+  ambience with glow on the flames.
+- Scripted server-side combat scenario on the host: basic-attack pursuit kills
+  a skeleton (armor visibly reducing damage), standing by a zombie applies a
+  ticking `POISONED` status (green DoT numbers, HUD label), `shield_bash`-style
+  stun + slow freeze/slow a goblin, an equipped Elven Sword's basic attack
+  kills a goblin and awards 15 kill XP through the `last_attacker_peer_id`
+  path. "You Died / Respawning" + town respawn still work; status effects are
+  cleared on death and respawn (caught and fixed a corpse-reburn that ticked a
+  respawned player).
+- Dedicated server + windowed client (`--server` + default client): client
+  created a character and spawned into town with a live HUD; both logs clean.
+- Headless dedicated boot is error/warning-free after temp verification
+  scaffolding was removed.
+
 ## [0.16.0] - 2026-06-11
 
 ### Added

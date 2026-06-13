@@ -10,3 +10,7 @@ display_name = "Axe"
 slot = &"main_hand"
 visual_scene = ExtResource("2")
 value = 60
+attack_damage = 14
+attack_interval = 1.8
+attack_range = 1.8
+rarity = &"common"

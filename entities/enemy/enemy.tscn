@@ -1,10 +1,11 @@
-[gd_scene load_steps=7 format=3]
+[gd_scene load_steps=8 format=3]
 
 [ext_resource type="Script" path="res://entities/enemy/enemy.gd" id="1"]
 [ext_resource type="Script" path="res://entities/enemy/enemy_controller.gd" id="2"]
 [ext_resource type="Script" path="res://entities/enemy/components/enemy_health_component.gd" id="3"]
 [ext_resource type="Script" path="res://entities/enemy/components/enemy_stats_component.gd" id="4"]
 [ext_resource type="Script" path="res://entities/enemy/components/enemy_visual_animator.gd" id="5"]
+[ext_resource type="Script" path="res://entities/components/status_effect_component.gd" id="6"]
 
 [sub_resource type="CapsuleShape3D" id="CapsuleShape3D_1"]
 radius = 0.4
@@ -37,3 +38,6 @@ script = ExtResource("4")
 
 [node name="Animator" type="Node" parent="."]
 script = ExtResource("5")
+
+[node name="StatusEffectComponent" type="Node" parent="."]
+script = ExtResource("6")

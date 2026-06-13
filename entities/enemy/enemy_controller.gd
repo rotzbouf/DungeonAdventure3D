@@ -18,7 +18,6 @@ enum State { IDLE, PATROL, AGGRO, ATTACK }
 const PATROL_RADIUS := 4.0
 const IDLE_TIME_MIN := 2.0
 const IDLE_TIME_MAX := 4.0
-const ATTACK_COOLDOWN := 1.5
 const ROTATION_SPEED := 10.0
 const TARGET_UPDATE_DISTANCE := 0.5
 const LEASH_MULTIPLIER := 1.5
@@ -26,6 +25,7 @@ const LEASH_MULTIPLIER := 1.5
 var _body: CharacterBody3D
 var _agent: NavigationAgent3D
 var _stats: Node
+var _status: Node
 var _players_root: Node3D
 var _rng := RandomNumberGenerator.new()
 
@@ -40,6 +40,7 @@ func _ready() -> void:
 	_body = get_parent()
 	_agent = _body.get_node("NavigationAgent3D")
 	_stats = _body.get_node("StatsComponent")
+	_status = _body.get_node_or_null("StatusEffectComponent")
 	_home_position = _body.global_position
 	_players_root = get_tree().root.find_child("Players", true, false)
 	_rng.randomize()
@@ -48,6 +49,12 @@ func _ready() -> void:
 
 
 func _physics_process(delta: float) -> void:
+	# Stunned: stand frozen (no movement, no attacks, no state transitions) —
+	# the stun's expiry is ticked by the StatusEffectComponent itself.
+	if _status != null and _status.is_stunned():
+		_body.velocity = Vector3.ZERO
+		_body.move_and_slide()
+		return
 	match _state:
 		State.IDLE:
 			_process_idle(delta)
@@ -124,12 +131,26 @@ func _process_attack(delta: float) -> void:
 
 	_attack_timer -= delta
 	if _attack_timer <= 0.0:
-		_attack_timer = ATTACK_COOLDOWN
-		var target_stats: Node = _target_player.get_node_or_null("StatsComponent")
-		if target_stats != null:
-			var damage := CombatSystem.compute_damage(_stats.attack_damage)
-			target_stats.hp = maxi(0, target_stats.hp - damage)
+		_attack_timer = _stats.attack_interval
+		_strike_target()
 		_body.on_attack_performed.rpc()
+
+
+## One landed melee hit on _target_player: full CombatSystem roll against the
+## victim's gear armor, applied through stats_component.apply_damage (so the
+## hit broadcasts to clients), plus this enemy's status proc if any.
+func _strike_target() -> void:
+	var target_stats: Node = _target_player.get_node_or_null("StatsComponent")
+	if target_stats == null:
+		return
+	var target_equipment: Node = _target_player.get_node_or_null("EquipmentComponent")
+	var armor: int = target_equipment.total_armor() if target_equipment != null else 0
+	var hit := CombatSystem.compute_hit(_stats.attack_damage, 0, armor, _stats.crit_chance, _rng)
+	target_stats.apply_damage(hit.amount, hit.is_crit)
+	if _stats.inflict_status != &"" and _rng.randf() < _stats.inflict_status_chance:
+		var target_status: Node = _target_player.get_node_or_null("StatusEffectComponent")
+		if target_status != null:
+			target_status.apply_effect(_stats.inflict_status, _stats.inflict_status_duration, _stats.inflict_status_magnitude)
 
 
 func _move_towards(next_point: Vector3, delta: float) -> void:
@@ -137,7 +158,8 @@ func _move_towards(next_point: Vector3, delta: float) -> void:
 	direction.y = 0.0
 	if direction.length() > 0.05:
 		direction = direction.normalized()
-		_body.velocity = direction * _stats.move_speed
+		var speed_mult: float = _status.speed_multiplier() if _status != null else 1.0
+		_body.velocity = direction * _stats.move_speed * speed_mult
 		_face_towards(_body.global_position + direction, delta)
 	else:
 		_body.velocity = Vector3.ZERO

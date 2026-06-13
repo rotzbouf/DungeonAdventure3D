@@ -6,6 +6,29 @@ extends Control
 @onready var _mp_bar: TextureProgressBar = $VBox/MpBar
 @onready var _mp_label: Label = $VBox/MpBar/MpLabel
 @onready var _gold_label: Label = $VBox/GoldLabel
+@onready var _status_effects: HBoxContainer = $VBox/StatusEffects
+
+## Display name + color per status id (status_effect_component.gd catalog).
+const STATUS_DISPLAY: Dictionary[StringName, Array] = {
+	&"poison": ["POISONED", Color(0.4, 0.9, 0.3)],
+	&"burn": ["BURNING", Color(1, 0.55, 0.15)],
+	&"slow": ["SLOWED", Color(0.5, 0.7, 1)],
+	&"stun": ["STUNNED", Color(1, 0.85, 0.3)],
+}
+
+
+## Driven by the local player's StatusEffectComponent.effects_changed
+## (replicated active_effects) — see hud.gd._connect_to_player.
+func update_status_effects(ids: Array[StringName]) -> void:
+	for child in _status_effects.get_children():
+		child.queue_free()
+	for effect_id in ids:
+		var display: Array = STATUS_DISPLAY.get(effect_id, [String(effect_id).to_upper(), Color.WHITE])
+		var label := Label.new()
+		label.text = display[0]
+		label.modulate = display[1]
+		label.add_theme_font_size_override("font_size", 12)
+		_status_effects.add_child(label)
 
 
 func update_level(new_level: int) -> void:

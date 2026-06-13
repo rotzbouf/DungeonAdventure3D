@@ -21,3 +21,7 @@ fire_breath_damage = 15
 fire_breath_range = 6.0
 fire_breath_cone_degrees = 60.0
 fire_breath_cooldown = 4.0
+armor = 3
+inflict_status = &"burn"
+inflict_status_duration = 4.0
+inflict_status_magnitude = 4.0

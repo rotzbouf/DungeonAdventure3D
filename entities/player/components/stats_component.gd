@@ -19,6 +19,11 @@ signal gold_changed(gold: int)
 ## directly since that's already replicated to every peer).
 signal died()
 
+## SERVER-ONLY: emitted by apply_damage before hp mutates, so player.gd can
+## broadcast the hit (amount/crit/type) for client-side feedback — the hp
+## value itself still replicates via the existing ON_CHANGE sync.
+signal damaged(amount: int, is_crit: bool, damage_type: StringName)
+
 var hp: int = 0:
 	set(value):
 		var was_alive := hp > 0
@@ -49,6 +54,18 @@ var gold: int = 0:
 	set(value):
 		gold = value
 		gold_changed.emit(gold)
+
+
+## The one damage entry point for players (M15) — enemy controllers and
+## world.apply_cone_hit call this instead of mutating hp directly, so every
+## hit produces exactly one `damaged` event. Mirrors
+## enemy_health_component.apply_damage.
+func apply_damage(amount: int, is_crit := false, damage_type := &"physical") -> void:
+	if not NetworkMode.is_server():
+		return
+	if amount > 0 and hp > 0:
+		damaged.emit(amount, is_crit, damage_type)
+	hp = maxi(0, hp - amount)
 
 
 func initialize(class_def: CharacterClass) -> void:

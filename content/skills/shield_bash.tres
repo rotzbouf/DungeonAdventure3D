@@ -11,3 +11,5 @@ cooldown_seconds = 4.0
 xp_reward = 20
 range = 2.0
 damage_base = 20
+inflict_status = &"stun"
+inflict_status_duration = 1.0

@@ -47,7 +47,8 @@ func _refresh_stock() -> void:
 		var item: Resource = GameDatabase.items.get(id)
 		var item_name: String = item.display_name if item != null else String(id)
 		var price: int = item.value if item != null else 0
-		_stock_list.add_item("%s - %d gold" % [item_name, price])
+		var row := _stock_list.add_item("%s - %d gold" % [item_name, price])
+		_stock_list.set_item_custom_fg_color(row, Rarity.color_for(item))
 
 
 func _on_inventory_changed(items: Array[StringName]) -> void:
@@ -65,7 +66,8 @@ func _on_inventory_changed(items: Array[StringName]) -> void:
 		var sell_price: int = (item.value / 2) if item != null else 0
 		var count: int = counts[id]
 		var label := "%s - %d gold" % [item_name, sell_price]
-		_inventory_list.add_item(label if count == 1 else "%s x%d" % [label, count])
+		var row := _inventory_list.add_item(label if count == 1 else "%s x%d" % [label, count])
+		_inventory_list.set_item_custom_fg_color(row, Rarity.color_for(item))
 
 
 func _on_stock_list_item_activated(index: int) -> void:

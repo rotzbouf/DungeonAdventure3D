@@ -15,3 +15,7 @@ attack_range = 1.5
 xp_reward = 30
 loot_item_id = &"health_potion"
 visual_scene = ExtResource("2")
+inflict_status = &"poison"
+inflict_status_duration = 5.0
+inflict_status_magnitude = 3.0
+inflict_status_chance = 0.75

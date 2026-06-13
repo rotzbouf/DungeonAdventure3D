@@ -15,3 +15,5 @@ attack_range = 1.2
 xp_reward = 15
 loot_item_id = &""
 visual_scene = ExtResource("2")
+crit_chance = 0.15
+attack_interval = 0.8

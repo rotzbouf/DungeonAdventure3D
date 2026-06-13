@@ -58,7 +58,11 @@ func request_use_skill(skill_id: StringName) -> void:
 
 	if skill.damage_base > 0:
 		var world := get_tree().root.find_child("World", true, false)
-		world.apply_area_hit(player.global_position, skill.range, CombatSystem.compute_damage(skill.damage_base), sender_id)
+		var equipment: Node = player.get_node_or_null("EquipmentComponent")
+		var attack_bonus: int = equipment.total_attack_bonus() if equipment != null else 0
+		var crit_chance: float = equipment.total_crit_chance() if equipment != null else CombatSystem.BASE_CRIT_CHANCE
+		world.apply_area_hit(player.global_position, skill.range, skill.damage_base, attack_bonus, crit_chance, sender_id,
+				skill.inflict_status, skill.inflict_status_duration, skill.inflict_status_magnitude)
 
 	on_skill_cast.rpc(skill_id)
 

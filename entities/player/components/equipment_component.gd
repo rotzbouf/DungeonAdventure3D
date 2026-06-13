@@ -58,6 +58,71 @@ func _player() -> CharacterBody3D:
 	return get_parent() as CharacterBody3D
 
 
+## --- Combat-stat aggregation (M15) ---------------------------------------
+## Read-only views over `equipped_slots`, resolved through GameDatabase like
+## every other id -> resource lookup. Called server-side by the damage paths
+## (player_controller.gd basic attacks, enemy/dragon controllers reading the
+## victim's armor) — `equipped_slots` is replicated, so these answers are
+## consistent on any peer that cares to ask.
+
+## Unarmed fallbacks, used whenever no main_hand weapon is equipped.
+const UNARMED_ATTACK_DAMAGE := 3
+const UNARMED_ATTACK_INTERVAL := 1.5
+const UNARMED_ATTACK_RANGE := 1.6
+
+
+## The equipped main_hand EquipmentItem, or null when unarmed.
+func weapon() -> EquipmentItem:
+	var item_id: StringName = equipped_slots.get(&"main_hand", &"")
+	if item_id == &"":
+		return null
+	return GameDatabase.items.get(item_id)
+
+
+func weapon_attack_damage() -> int:
+	var item := weapon()
+	return item.attack_damage if item != null else UNARMED_ATTACK_DAMAGE
+
+
+func weapon_attack_interval() -> float:
+	var item := weapon()
+	return item.attack_interval if item != null else UNARMED_ATTACK_INTERVAL
+
+
+func weapon_attack_range() -> float:
+	var item := weapon()
+	return item.attack_range if item != null else UNARMED_ATTACK_RANGE
+
+
+## Flat attack added on top of a skill/spell's authored damage_base.
+func total_attack_bonus() -> int:
+	var total := 0
+	for slot in equipped_slots:
+		var item: EquipmentItem = GameDatabase.items.get(equipped_slots[slot])
+		if item != null:
+			total += item.attack_damage
+	return total
+
+
+## Flat mitigation applied when the wearer is hit (CombatSystem.compute_hit).
+func total_armor() -> int:
+	var total := 0
+	for slot in equipped_slots:
+		var item: EquipmentItem = GameDatabase.items.get(equipped_slots[slot])
+		if item != null:
+			total += item.armor
+	return total
+
+
+func total_crit_chance() -> float:
+	var total := CombatSystem.BASE_CRIT_CHANCE
+	for slot in equipped_slots:
+		var item: EquipmentItem = GameDatabase.items.get(equipped_slots[slot])
+		if item != null:
+			total += item.crit_chance_bonus
+	return total
+
+
 ## Client -> server: "I'd like to equip this item into this slot." Declared on
 ## this node so Godot routes the call to the same node path on the server —
 ## mirrors player_input.gd.request_move_to / world.gd.request_create_character.
@@ -138,6 +203,22 @@ func _attach_visual_for_slot(slot: StringName, item_id: StringName) -> void:
 
 	_attachments[slot] = attachment
 	_attached_items[slot] = item_id
+
+
+## Client-side basic-attack swing (M15): a quick procedural rotate-and-back
+## tween on the main_hand BoneAttachment3D. The player rigs ship no melee
+## clip, so this is the whole swing animation — a no-op when unarmed (the
+## swing SFX from player.gd.on_attack_performed still plays).
+func play_swing_tween() -> void:
+	var attachment: BoneAttachment3D = _attachments.get(&"main_hand")
+	if attachment == null or not is_instance_valid(attachment):
+		return
+	var start_rotation := attachment.rotation
+	var tween := attachment.create_tween()
+	tween.tween_property(attachment, "rotation:x", start_rotation.x - PI / 2.0, 0.1) \
+			.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	tween.tween_property(attachment, "rotation:x", start_rotation.x, 0.15) \
+			.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
 
 
 func _find_skeleton(player: CharacterBody3D) -> Skeleton3D:

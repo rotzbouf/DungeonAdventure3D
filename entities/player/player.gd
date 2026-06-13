@@ -54,6 +54,28 @@ func _ready() -> void:
 
 	if NetworkMode.is_server():
 		_stats.died.connect(_on_died)
+		_stats.damaged.connect(_on_damaged)
+
+
+## Server-only: bridge the stats component's damage event to a broadcast so
+## every peer renders the hit (number/flash) — mirrors enemy.gd's
+## _on_health_hit -> on_enemy_hit pipeline.
+func _on_damaged(amount: int, is_crit: bool, damage_type: StringName) -> void:
+	on_player_hit.rpc(amount, is_crit, damage_type)
+
+
+## Broadcast (call_local) — purely cosmetic, the server already applied the
+## damage; hp itself replicates via the existing ON_CHANGE sync. Only the
+## victim's own client shakes its camera.
+@rpc("authority", "call_local", "reliable")
+func on_player_hit(amount: int, is_crit: bool, damage_type: StringName) -> void:
+	if NetworkMode.is_dedicated_server():
+		return
+	HitFlash.flash($Model)
+	var world := get_tree().root.find_child("World", true, false)
+	DamageNumber.spawn(world, global_position, amount, is_crit, damage_type, true)
+	if owning_peer_id() == multiplayer.get_unique_id() and NetworkMode.is_client():
+		_camera_rig.shake(0.25 if is_crit else 0.15, 0.25)
 
 
 ## Server-only: HP hit 0 (stats_component.gd's died signal). After
@@ -61,6 +83,8 @@ func _ready() -> void:
 ## death overlay (hud.gd, driven by the same replicated hp_changed signal)
 ## covers the in-between feedback, so no extra RPC is needed here.
 func _on_died() -> void:
+	# A dead (and soon-respawned) player must not keep ticking poison/burn.
+	$StatusEffectComponent.clear_all()
 	_drop_inventory_on_death()
 	get_tree().create_timer(RESPAWN_DELAY).timeout.connect(_respawn)
 
@@ -78,9 +102,24 @@ func _drop_inventory_on_death() -> void:
 
 
 func _respawn() -> void:
+	# Cleared on death too, but an enemy's already-in-flight swing can land on
+	# the corpse during the respawn delay and re-apply a DoT (observed: dragon
+	# melee re-burning a dead player, who then ticked 4 hp in town).
+	$StatusEffectComponent.clear_all()
 	var world := get_tree().root.find_child("World", true, false)
 	_controller.reset_to(world.get_spawn_position(0))
 	_stats.hp = _stats.max_hp
+
+
+## Broadcast (call_local) so every peer sees the weapon swing — purely
+## cosmetic, the server already rolled and applied the hit. Mirrors
+## enemy.gd.on_attack_performed.
+@rpc("authority", "call_local", "reliable")
+func on_attack_performed() -> void:
+	if NetworkMode.is_dedicated_server():
+		return
+	$EquipmentComponent.play_swing_tween()
+	AudioManager.play_sfx(&"sword_swing")
 
 
 ## Public so sibling components (e.g. equipment_component.gd's request_equip)
@@ -115,6 +154,7 @@ func _setup_replication(synchronizer: MultiplayerSynchronizer) -> void:
 		NodePath("SkillComponent:known_skill_ids"),
 		NodePath("SpellbookComponent:known_spell_ids"),
 		NodePath("InventoryComponent:items"),
+		NodePath("StatusEffectComponent:active_effects"),
 	]
 	for prop_path in on_change_paths:
 		config.add_property(prop_path)

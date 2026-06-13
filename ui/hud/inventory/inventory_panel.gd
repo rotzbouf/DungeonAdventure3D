@@ -32,7 +32,8 @@ func _on_inventory_changed(items: Array[StringName]) -> void:
 		var item: Resource = GameDatabase.items.get(id)
 		var item_name: String = item.display_name if item != null else String(id)
 		var count: int = counts[id]
-		_list.add_item(item_name if count == 1 else "%s x%d" % [item_name, count])
+		var row := _list.add_item(item_name if count == 1 else "%s x%d" % [item_name, count])
+		_list.set_item_custom_fg_color(row, Rarity.color_for(item))
 
 
 func _on_item_list_item_activated(index: int) -> void:

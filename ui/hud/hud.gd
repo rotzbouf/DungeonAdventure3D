@@ -29,6 +29,11 @@ var _local_player: Node
 
 func _ready() -> void:
 	NetworkManager.connected_to_server.connect(func(): _searching = true, CONNECT_ONE_SHOT)
+	# connected_to_server is a client-side ENet signal and never fires for the
+	# listen host itself — it is "connected" from the start, so begin searching
+	# immediately (same listen-host special case as character_creation_screen).
+	if NetworkMode.mode == NetworkMode.Mode.LISTEN_HOST:
+		_searching = true
 
 
 func _process(_delta: float) -> void:
@@ -87,7 +92,8 @@ func _connect_to_player(player: Node) -> void:
 	var skill_comp: Node = player.get_node_or_null("SkillComponent")
 	var spellbook: Node = player.get_node_or_null("SpellbookComponent")
 	var inventory: Node = player.get_node_or_null("InventoryComponent")
-	if stats == null or level_comp == null or skill_comp == null or spellbook == null or inventory == null:
+	var status: Node = player.get_node_or_null("StatusEffectComponent")
+	if stats == null or level_comp == null or skill_comp == null or spellbook == null or inventory == null or status == null:
 		return  # Components not yet ready — retry next frame.
 
 	_stats_bar.update_level(level_comp.level)
@@ -109,6 +115,8 @@ func _connect_to_player(player: Node) -> void:
 	skill_comp.skills_changed.connect(_hotbar.update_skills)
 	skill_comp.skill_use_rejected.connect(_on_skill_rejected)
 	skill_comp.skill_cast.connect(func(_id: StringName) -> void: AudioManager.play_sfx(&"sword_swing"))
+	_stats_bar.update_status_effects(status.active_effects)
+	status.effects_changed.connect(_stats_bar.update_status_effects)
 	spellbook.spells_changed.connect(_hotbar.update_spells)
 	spellbook.spell_learned.connect(_on_spell_learned)
 	spellbook.spell_use_rejected.connect(_on_skill_rejected)

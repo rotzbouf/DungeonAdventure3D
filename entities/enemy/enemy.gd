@@ -12,7 +12,6 @@ extends CharacterBody3D
 var definition_id: StringName
 
 const DeathBurstScene := preload("res://entities/vfx/death_burst.tscn")
-const DamageLabelFont := preload("res://assets/fonts/Cinzel-Variable.ttf")
 
 @onready var _controller: Node = $Controller
 @onready var _health: Node = $HealthComponent
@@ -50,19 +49,27 @@ func _on_health_depleted() -> void:
 		on_died.rpc()
 
 
-func _on_health_hit(amount: int) -> void:
+func _on_health_hit(amount: int, is_crit: bool, damage_type: StringName, attacker_peer_id: int) -> void:
 	if NetworkMode.is_server():
-		on_enemy_hit.rpc(amount)
+		on_enemy_hit.rpc(amount, is_crit, damage_type, attacker_peer_id)
 
 
 ## Broadcast (call_local) so every peer plays a hit flash and floating damage
-## number; purely cosmetic, the server has already applied the damage.
+## number; purely cosmetic, the server has already applied (and rolled) the
+## damage. attacker_peer_id lets the one peer who dealt a crit shake its own
+## camera — everyone else ignores it.
 @rpc("authority", "call_local", "reliable")
-func on_enemy_hit(amount: int) -> void:
-	if NetworkMode.is_server():
+func on_enemy_hit(amount: int, is_crit: bool, damage_type: StringName, attacker_peer_id: int) -> void:
+	if NetworkMode.is_dedicated_server():
 		return
-	_play_hit_flash()
-	_spawn_damage_label(amount)
+	HitFlash.flash(_model)
+	var world := get_tree().root.find_child("World", true, false)
+	DamageNumber.spawn(world, global_position, amount, is_crit, damage_type)
+	if is_crit and attacker_peer_id == multiplayer.get_unique_id():
+		var players_root := get_tree().root.find_child("Players", true, false)
+		var attacker := players_root.get_node_or_null("Player_%d" % attacker_peer_id) if players_root != null else null
+		if attacker != null:
+			attacker.get_node("CameraRig").shake(0.1, 0.15)
 
 
 ## Broadcast (call_local) so every peer plays the attack/breath animation;
@@ -127,59 +134,6 @@ func _spawn_death_burst() -> void:
 	burst.global_position = global_position
 
 
-func _play_hit_flash() -> void:
-	if _model.get_child_count() == 0:
-		return
-	var meshes: Array[MeshInstance3D] = []
-	_collect_mesh_instances(_model.get_child(0), meshes)
-	if meshes.is_empty():
-		return
-	var flash_material := StandardMaterial3D.new()
-	flash_material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	flash_material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	flash_material.albedo_color = Color(1, 1, 1, 1)
-	flash_material.emission_enabled = true
-	flash_material.emission = Color(1, 1, 1, 1)
-	for mesh in meshes:
-		mesh.material_overlay = flash_material
-
-	var clear_overlay := func() -> void:
-		for mesh in meshes:
-			if mesh.material_overlay == flash_material:
-				mesh.material_overlay = null
-
-	var tween := create_tween()
-	tween.tween_property(flash_material, "albedo_color:a", 0.0, 0.15)
-	tween.tween_callback(clear_overlay)
-
-
-func _collect_mesh_instances(node: Node, result: Array[MeshInstance3D]) -> void:
-	if node is MeshInstance3D:
-		result.append(node)
-	for child in node.get_children():
-		_collect_mesh_instances(child, result)
-
-
-func _spawn_damage_label(amount: int) -> void:
-	var world := get_tree().root.find_child("World", true, false)
-	if world == null:
-		return
-	var label := Label3D.new()
-	label.text = str(amount)
-	label.font = DamageLabelFont
-	label.font_size = 48
-	label.modulate = Color(1, 0.2, 0.2, 1)
-	label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
-	label.no_depth_test = true
-	world.add_child(label)
-	label.global_position = global_position + Vector3(0, 2.0, 0)
-
-	var tween := create_tween()
-	tween.tween_property(label, "global_position:y", label.global_position.y + 1.0, 1.0)
-	tween.parallel().tween_property(label, "modulate:a", 0.0, 1.0)
-	tween.tween_callback(label.queue_free)
-
-
 func _setup_replication(synchronizer: MultiplayerSynchronizer) -> void:
 	var config := SceneReplicationConfig.new()
 	for prop_path in [NodePath(".:position"), NodePath(".:rotation")]:
@@ -190,6 +144,7 @@ func _setup_replication(synchronizer: MultiplayerSynchronizer) -> void:
 	var on_change_paths := [
 		NodePath("HealthComponent:hp"),
 		NodePath("HealthComponent:max_hp"),
+		NodePath("StatusEffectComponent:active_effects"),
 	]
 	for prop_path in on_change_paths:
 		config.add_property(prop_path)

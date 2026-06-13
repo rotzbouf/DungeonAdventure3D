@@ -3,6 +3,7 @@
 [ext_resource type="Texture2D" path="res://entities/dungeon/props/PropSet_BASE COLOR_Prop.png" id="1_bkw2m"]
 [ext_resource type="Texture2D" path="res://entities/dungeon/props/PropSet_METALLIC_Prop-ROUGHNESS_Prop.png" id="2_62a5q"]
 [ext_resource type="Texture2D" path="res://entities/dungeon/props/PropSet_NORMAL_Prop.png" id="3_inpee"]
+[ext_resource type="PackedScene" path="res://entities/dungeon/props/flame_light_brazier.tscn" id="4_flame"]
 
 [sub_resource type="StandardMaterial3D" id="StandardMaterial3D_8rpje"]
 resource_name = "PropsMaterial"
@@ -52,3 +53,6 @@ shadow_mesh = SubResource("ArrayMesh_qmax6")
 
 [node name="Prop_Brazier_1" type="MeshInstance3D" unique_id=388879794]
 mesh = SubResource("ArrayMesh_58vy7")
+
+[node name="FlameLight" parent="." instance=ExtResource("4_flame")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.6, 0)

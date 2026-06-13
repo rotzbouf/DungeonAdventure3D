@@ -14,6 +14,21 @@ extends Resource
 @export var loot_item_id: StringName = &""
 @export var visual_scene: PackedScene
 
+## Combat variety (M15). Inert defaults — content gives each enemy a
+## distinguishing trait (skeleton: armor, goblin: fast crits, zombie: poison)
+## without any new code per enemy type.
+@export var armor: int = 0
+@export var crit_chance: float = 0.0
+## Seconds between melee attacks (was the hardcoded ATTACK_COOLDOWN 1.5).
+@export var attack_interval: float = 1.5
+## Status effect rolled on each landed melee hit (status_effect_component.gd
+## ids: &"poison", &"burn", &"slow", &"stun"). Empty = never.
+@export var inflict_status: StringName = &""
+@export var inflict_status_duration: float = 0.0
+## poison/burn: damage per 1s tick; slow: speed multiplier; stun: unused.
+@export var inflict_status_magnitude: float = 0.0
+@export var inflict_status_chance: float = 1.0
+
 ## Boss-only fields (M13). Inert defaults for non-boss enemies — only
 ## dragon.tres sets these to non-default values.
 @export var is_boss: bool = false
