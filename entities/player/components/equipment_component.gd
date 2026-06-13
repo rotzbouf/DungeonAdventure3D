@@ -13,9 +13,15 @@ extends Node
 ## exactly like model_view.gd re-resolves race -> visual_scene from race_id.
 
 ## Server-only feedback for the requesting peer. Mirrors world.gd's
-## character_creation_failed signal bridge — no UI consumes this yet, the
-## verification harness triggers and observes it directly.
+## character_creation_failed signal bridge.
 signal equip_rejected(reason: String)
+
+## Client-side: the equipped set changed (equip/unequip). Emitted by the
+## presentation RPCs below — NOT by the `equipped_slots` replication setter,
+## which can fire before the node is parented (lesson 6). The inventory panel
+## connects to this to refresh its equipped section. `slots` is the current
+## equipped_slots dict.
+signal equipment_changed(slots: Dictionary)
 
 ## slot -> equipped item id, e.g. {&"main_hand": &"sword"}. Replicated via
 ## player.gd._setup_replication with REPLICATION_MODE_ON_CHANGE (spawn=true)
@@ -123,38 +129,92 @@ func total_crit_chance() -> float:
 	return total
 
 
-## Client -> server: "I'd like to equip this item into this slot." Declared on
-## this node so Godot routes the call to the same node path on the server —
-## mirrors player_input.gd.request_move_to / world.gd.request_create_character.
+## Client -> server: "equip this item from my bag" (M15.1). The destination
+## slot is the item's own `slot`. Declared on this node so Godot routes the
+## call to the same node path on the server — mirrors
+## player_input.gd.request_move_to / world.gd.request_create_character.
 @rpc("any_peer", "call_local", "reliable")
-func request_equip(slot: StringName, item_id: StringName) -> void:
+func request_equip(item_id: StringName) -> void:
 	if not NetworkMode.is_server():
 		return
 	var sender_id: int = multiplayer.get_remote_sender_id()
 	if sender_id != _player().owning_peer_id():
 		push_warning("equipment_component: rejected equip request from non-owning peer %d" % sender_id)
 		return
+	var inventory: Node = _player().get_node_or_null("InventoryComponent")
+	if inventory == null or item_id not in inventory.items:
+		on_equip_rejected.rpc_id(sender_id, "You don't have that item.")
+		return
+	var item: Resource = GameDatabase.items.get(item_id)
+	if not (item is EquipmentItem):
+		on_equip_rejected.rpc_id(sender_id, "That item can't be equipped.")
+		return
+	var slot: StringName = item.slot
 	var reason := EquipValidationSystem.can_equip(item_id, slot)
 	if reason != "":
-		push_warning("equipment_component: rejected equip request from peer %d: %s" % [sender_id, reason])
 		on_equip_rejected.rpc_id(sender_id, reason)
 		return
-	# Authoritative mutation: in place, not a whole-dict assignment — the
-	# server is the source of truth and has no visuals to drive off its own
-	# setter (see the `set` above). MultiplayerSynchronizer carries the
-	# resulting value to every peer, including late joiners.
+	# Swap: pull the item out of the bag and into the slot; whatever was in the
+	# slot goes back to the bag. Whole-array assignment (not in-place) so the
+	# InventoryComponent.items setter fires on a listen host too (lesson 22) —
+	# on a dedicated server the setter no-ops but the value still replicates.
+	var bag: Array[StringName] = inventory.items.duplicate()
+	bag.erase(item_id)
+	var previous: StringName = equipped_slots.get(slot, &"")
+	if previous != &"":
+		bag.append(previous)
+	inventory.items = bag
 	equipped_slots[slot] = item_id
 	on_equip_changed.rpc(slot, item_id)
 
 
-## Server -> every peer (broadcast, deliberately NO call_local: the
-## broadcaster is the headless server, which has nothing to attach a visual
-## to — the equipping client is just an ordinary recipient like everyone
-## else). Each receiver mirrors the authoritative dict and (re)attaches.
-@rpc("authority", "call_remote", "reliable")
+## Client -> server: "unequip this slot back into my bag".
+@rpc("any_peer", "call_local", "reliable")
+func request_unequip(slot: StringName) -> void:
+	if not NetworkMode.is_server():
+		return
+	var sender_id: int = multiplayer.get_remote_sender_id()
+	if sender_id != _player().owning_peer_id():
+		push_warning("equipment_component: rejected unequip request from non-owning peer %d" % sender_id)
+		return
+	var item_id: StringName = equipped_slots.get(slot, &"")
+	if item_id == &"":
+		return  # nothing equipped there
+	var inventory: Node = _player().get_node_or_null("InventoryComponent")
+	if inventory != null:
+		var bag: Array[StringName] = inventory.items.duplicate()
+		bag.append(item_id)
+		inventory.items = bag
+	equipped_slots.erase(slot)
+	on_unequip.rpc(slot)
+
+
+## Server -> every peer, call_local (lesson 21): the listen host must run this
+## for its OWN player, since its in-place server mutation never fires the
+## `equipped_slots` setter and the synchronizer doesn't echo to the authority.
+## Headless dedicated server early-outs (no skeleton to attach to). Remote
+## clients also get the visual via the replication setter; _attached_items
+## keeps the double-drive idempotent.
+@rpc("authority", "call_local", "reliable")
 func on_equip_changed(slot: StringName, item_id: StringName) -> void:
+	if NetworkMode.is_dedicated_server():
+		return
 	equipped_slots[slot] = item_id
 	_attach_visual_for_slot(slot, item_id)
+	equipment_changed.emit(equipped_slots)
+
+
+## Server -> every peer, call_local — the detach counterpart of
+## on_equip_changed. The replication setter only ever *attaches* present slots
+## (it never detaches a removed one), so every peer needs this to drop the
+## visual.
+@rpc("authority", "call_local", "reliable")
+func on_unequip(slot: StringName) -> void:
+	if NetworkMode.is_dedicated_server():
+		return
+	equipped_slots.erase(slot)
+	_detach_visual_for_slot(slot)
+	equipment_changed.emit(equipped_slots)
 
 
 @rpc("authority", "call_local", "reliable")
@@ -183,11 +243,7 @@ func _attach_visual_for_slot(slot: StringName, item_id: StringName) -> void:
 		call_deferred("_attach_visual_for_slot", slot, item_id)
 		return
 
-	var existing: BoneAttachment3D = _attachments.get(slot)
-	if existing != null:
-		existing.queue_free()
-		_attachments.erase(slot)
-		_attached_items.erase(slot)
+	_detach_visual_for_slot(slot)
 
 	var item: EquipmentItem = GameDatabase.items.get(item_id)
 	var race: RaceModel = GameDatabase.races.get(player.race_id)
@@ -203,6 +259,17 @@ func _attach_visual_for_slot(slot: StringName, item_id: StringName) -> void:
 
 	_attachments[slot] = attachment
 	_attached_items[slot] = item_id
+
+
+## Frees the BoneAttachment3D currently representing `slot` (if any) and clears
+## the bookkeeping so a future re-equip of the same item re-attaches. Shared by
+## re-equip (inside _attach_visual_for_slot) and unequip (on_unequip).
+func _detach_visual_for_slot(slot: StringName) -> void:
+	var existing: BoneAttachment3D = _attachments.get(slot)
+	if existing != null and is_instance_valid(existing):
+		existing.queue_free()
+	_attachments.erase(slot)
+	_attached_items.erase(slot)
 
 
 ## Client-side basic-attack swing (M15): a quick procedural rotate-and-back

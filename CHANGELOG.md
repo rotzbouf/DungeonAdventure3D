@@ -6,6 +6,50 @@ project uses [Semantic Versioning](https://semver.org/) (`MAJOR.MINOR.PATCH`).
 
 ## [Unreleased]
 
+## [0.17.1] - 2026-06-13
+
+Completes M15: makes equipped gear reachable. M15 gave weapons combat stats and
+a basic attack that reads the equipped weapon, but there was no in-game way to
+*equip* anything — `request_equip` had no UI caller and the inventory's
+double-click only handled consumables, so a bought weapon sat in the bag and
+the player fought permanently unarmed (fallback stats).
+
+### Added
+- Equip / unequip from the inventory panel (`ui/hud/inventory/inventory_panel.gd`).
+  The panel now lists equipped items first (marked `[E]`, double-click to
+  unequip back to the bag), then bag items; double-clicking a bag row equips it
+  (equipment) or uses it (consumable) per the item's type. Rarity-colored
+  throughout.
+- `EquipmentComponent.request_equip(item_id)` is now inventory-aware: it pulls
+  the item from the bag into its slot and returns any previous occupant to the
+  bag (a swap), instead of equipping a phantom item that stays in the bag. New
+  `request_unequip(slot)` returns an equipped item to the bag. New
+  `equipment_changed` signal drives the panel's equipped section.
+
+### Fixed
+- The listen-host `on_equip_changed` gap (the known dead-code gap noted in the
+  v0.16.0 audit, now actually reachable): it was a `call_remote` broadcast, so a
+  listen host never ran it for its own player and the host's equipped weapon
+  never visually attached. Made `on_equip_changed`/`on_unequip` `call_local`
+  with an `is_dedicated_server()` guard (headless has no skeleton to attach to);
+  remote clients still get the visual via the replication setter, kept
+  idempotent by `_attached_items`. The replication setter only ever *attaches*
+  present slots, so unequip's visual detach also rides these RPCs.
+- Inventory mutations in the equip/unequip paths use whole-array assignment
+  (not in-place), so the `InventoryComponent.items` setter — and thus
+  `inventory_changed` — fires on a listen host too, keeping the host's own
+  panel in sync.
+
+### Verified
+- Listen host (`./run.sh --host`): with a seeded bag (temp hook, removed),
+  double-click equips an Elven Sword — it moves to the `[E]` section, leaves the
+  bag, and the blade attaches to the `Weapon_R` bone (confirmed via a temp debug
+  print: `ATTACHED elven_sword to slot main_hand on bone Weapon_R`, no warning /
+  retry). Double-click unequips it back to the bag and detaches the visual
+  (`DETACHED slot main_hand`); re-equipping reattaches (proving the detach
+  cleared `_attached_items`). Equipping the Axe swaps the Sword back to the bag.
+  Headless dedicated boot clean after the temp scaffolding was removed.
+
 ## [0.17.0] - 2026-06-13
 
 M15 "Combat & Game Feel": turns the 10-line damage stub into a real combat

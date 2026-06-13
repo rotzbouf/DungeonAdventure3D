@@ -93,7 +93,8 @@ func _connect_to_player(player: Node) -> void:
 	var spellbook: Node = player.get_node_or_null("SpellbookComponent")
 	var inventory: Node = player.get_node_or_null("InventoryComponent")
 	var status: Node = player.get_node_or_null("StatusEffectComponent")
-	if stats == null or level_comp == null or skill_comp == null or spellbook == null or inventory == null or status == null:
+	var equipment: Node = player.get_node_or_null("EquipmentComponent")
+	if stats == null or level_comp == null or skill_comp == null or spellbook == null or inventory == null or status == null or equipment == null:
 		return  # Components not yet ready — retry next frame.
 
 	_stats_bar.update_level(level_comp.level)
@@ -105,6 +106,7 @@ func _connect_to_player(player: Node) -> void:
 	_hotbar.update_spells(spellbook.known_spell_ids)
 	_hotbar.set_spellbook_component(spellbook)
 	_inventory.set_inventory_component(inventory)
+	_inventory.set_equipment_component(equipment)
 
 	stats.hp_changed.connect(_stats_bar.update_hp)
 	stats.hp_changed.connect(_on_hp_changed)
