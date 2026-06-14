@@ -12,6 +12,9 @@ signal level_changed(new_level: int)
 signal xp_changed(new_xp: int)
 ## Emitted on the owning client when a level-up RPC arrives.
 signal leveled_up(new_level: int, new_skill_ids: Array[StringName])
+## Emitted on the owning client when a level grants a talent choice (M16) —
+## the HUD shows level_up_overlay.tscn, which resolves it via request_choose_skill.
+signal level_up_choice_offered(level: int, options: Array[StringName])
 
 var level: int = 1:
 	set(value):
@@ -26,6 +29,12 @@ var current_xp: int = 0:
 ## Stored so gain_xp can look up the right LevelCurve without needing a parameter.
 ## Set by initialize() in world.gd._spawn_player before the node enters the tree.
 var _class_id: StringName = &""
+
+## Server-only, never replicated: talent choices offered but not yet resolved
+## via request_choose_skill. Entries: {"level": int, "options": Array[StringName]}.
+## A late joiner who is already past a level never has a pending entry for it
+## (this array starts empty on spawn), so they never see a stale overlay.
+var _pending_choices: Array[Dictionary] = []
 
 
 func initialize(class_def: CharacterClass) -> void:
@@ -56,8 +65,13 @@ func gain_xp(amount: int) -> void:
 	if result.leveled_up:
 		level = result.new_level
 		var new_skills: Array[StringName] = []
+		var new_pending: Array[Dictionary] = []
 		for lvl in range(old_level + 1, result.new_level + 1):
-			new_skills.append_array(SkillUnlockSystem.newly_unlocked_at(player_class, lvl))
+			var choices := SkillUnlockSystem.choices_at(player_class, lvl)
+			if choices.size() >= 2:
+				new_pending.append({"level": lvl, "options": choices})
+			else:
+				new_skills.append_array(SkillUnlockSystem.newly_unlocked_at(player_class, lvl))
 
 		if not new_skills.is_empty():
 			var skill_comp: Node = get_parent().get_node_or_null("SkillComponent")
@@ -68,9 +82,48 @@ func gain_xp(amount: int) -> void:
 						updated.append(s)
 				skill_comp.known_skill_ids = updated
 
+		_pending_choices.append_array(new_pending)
 		on_level_up.rpc_id(get_parent().owning_peer_id(), result.new_level, new_skills)
+		for pending in new_pending:
+			on_level_up_choice.rpc_id(get_parent().owning_peer_id(), pending.level, pending.options)
 
 
 @rpc("authority", "call_local", "reliable")
 func on_level_up(new_level: int, new_skill_ids: Array[StringName]) -> void:
 	leveled_up.emit(new_level, new_skill_ids)
+
+
+## Targeted (call_local) so only the leveling player's own HUD shows the
+## talent-choice overlay. Mirrors on_level_up's targeting.
+@rpc("authority", "call_local", "reliable")
+func on_level_up_choice(level: int, options: Array[StringName]) -> void:
+	level_up_choice_offered.emit(level, options)
+
+
+## Resolves a pending talent choice. Mirrors skill_component.request_use_skill's
+## any_peer/call_local + owning-peer check.
+@rpc("any_peer", "call_local", "reliable")
+func request_choose_skill(level: int, skill_id: StringName) -> void:
+	if not NetworkMode.is_server():
+		return
+	var sender_id: int = multiplayer.get_remote_sender_id()
+	if sender_id != get_parent().owning_peer_id():
+		push_warning("level_component: rejected choice from non-owning peer %d" % sender_id)
+		return
+
+	var index := -1
+	for i in _pending_choices.size():
+		var pending: Dictionary = _pending_choices[i]
+		if pending.level == level and skill_id in pending.options:
+			index = i
+			break
+	if index == -1:
+		return
+	_pending_choices.remove_at(index)
+
+	var skill_comp: Node = get_parent().get_node_or_null("SkillComponent")
+	if skill_comp != null:
+		var updated: Array[StringName] = skill_comp.known_skill_ids.duplicate()
+		if not skill_id in updated:
+			updated.append(skill_id)
+		skill_comp.known_skill_ids = updated

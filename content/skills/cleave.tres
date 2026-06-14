@@ -1,0 +1,13 @@
+[gd_resource type="Resource" script_class="Skill" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/skill.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = &"cleave"
+display_name = "Cleave"
+mp_cost = 12
+cooldown_seconds = 3.0
+xp_reward = 20
+range = 2.2
+damage_base = 22

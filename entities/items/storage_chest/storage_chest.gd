@@ -10,9 +10,9 @@ extends StaticBody3D
 ## and the Players/Player_<id> lookup key, so a peer can only ever touch its
 ## own storage/inventory -- no extra ownership check needed.
 
-signal storage_updated(items: Array[StringName])
+signal storage_updated(items: Array[Dictionary])
 
-var _storage: Dictionary = {}  # int (peer_id) -> Array[StringName]
+var _storage: Dictionary = {}  # int (peer_id) -> Array[Dictionary]
 
 
 ## Client-local: opens the HUD's StoragePanel, which itself sends
@@ -33,39 +33,45 @@ func request_open_storage() -> void:
 
 
 @rpc("any_peer", "call_local", "reliable")
-func request_deposit_item(item_id: StringName) -> void:
+func request_deposit_item(iid: String) -> void:
 	if not NetworkMode.is_server():
 		return
 	var sender_id: int = multiplayer.get_remote_sender_id()
 	var inventory := _inventory_for(sender_id)
-	if inventory == null or item_id not in inventory.items:
+	if inventory == null:
 		return
-	inventory.items.erase(item_id)
+	var index := ItemInstanceSystem.find_index_by_iid(inventory.items, iid)
+	if index == -1:
+		return
+	var instance: Dictionary = inventory.items[index]
+	inventory.items.remove_at(index)
 	var stored := _stored_items(sender_id)
-	stored.append(item_id)
+	stored.append(instance)
 	_storage[sender_id] = stored
 	on_storage_updated.rpc_id(sender_id, stored)
 
 
 @rpc("any_peer", "call_local", "reliable")
-func request_withdraw_item(item_id: StringName) -> void:
+func request_withdraw_item(iid: String) -> void:
 	if not NetworkMode.is_server():
 		return
 	var sender_id: int = multiplayer.get_remote_sender_id()
 	var stored := _stored_items(sender_id)
-	if item_id not in stored:
+	var index := ItemInstanceSystem.find_index_by_iid(stored, iid)
+	if index == -1:
 		return
 	var inventory := _inventory_for(sender_id)
 	if inventory == null:
 		return
-	stored.erase(item_id)
+	var instance: Dictionary = stored[index]
+	stored.remove_at(index)
 	_storage[sender_id] = stored
-	inventory.add_item(item_id)
+	inventory.add_item(instance)
 	on_storage_updated.rpc_id(sender_id, stored)
 
 
 @rpc("authority", "call_local", "reliable")
-func on_storage_updated(items: Array[StringName]) -> void:
+func on_storage_updated(items: Array[Dictionary]) -> void:
 	storage_updated.emit(items)
 
 
@@ -77,10 +83,10 @@ func _inventory_for(peer_id: int) -> Node:
 	return player.get_node_or_null("InventoryComponent")
 
 
-## _storage.get(peer_id, []) can't be assigned directly to an Array[StringName]
+## _storage.get(peer_id, []) can't be assigned directly to an Array[Dictionary]
 ## (the [] default is an untyped Array, which fails the typed-array check at
 ## runtime) -- this does the has-check instead.
-func _stored_items(peer_id: int) -> Array[StringName]:
+func _stored_items(peer_id: int) -> Array[Dictionary]:
 	if _storage.has(peer_id):
 		return _storage[peer_id]
 	return []

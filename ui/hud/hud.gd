@@ -19,6 +19,7 @@ extends CanvasLayer
 @onready var _death_overlay = $DeathOverlay
 @onready var _shop_panel = $ShopPanel
 @onready var _storage_panel = $StoragePanel
+@onready var _level_up_overlay = $LevelUpOverlay
 
 var _connected := false
 var _searching := false  # becomes true only after connected_to_server fires
@@ -114,6 +115,8 @@ func _connect_to_player(player: Node) -> void:
 	stats.gold_changed.connect(_stats_bar.update_gold)
 	level_comp.level_changed.connect(_stats_bar.update_level)
 	level_comp.leveled_up.connect(_on_leveled_up)
+	level_comp.level_up_choice_offered.connect(func(level: int, options: Array[StringName]) -> void:
+		_level_up_overlay.show_choice(level_comp, level, options))
 	skill_comp.skills_changed.connect(_hotbar.update_skills)
 	skill_comp.skill_use_rejected.connect(_on_skill_rejected)
 	skill_comp.skill_cast.connect(func(_id: StringName) -> void: AudioManager.play_sfx(&"sword_swing"))

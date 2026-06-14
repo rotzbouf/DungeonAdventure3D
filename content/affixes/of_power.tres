@@ -1,0 +1,11 @@
+[gd_resource type="Resource" script_class="AffixDefinition" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/affix_definition.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = &"of_power"
+display_name = "of Power"
+stat = &"attack_damage"
+min_value = 1.0
+max_value = 3.0

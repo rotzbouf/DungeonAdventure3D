@@ -226,7 +226,7 @@ func _spawn_enemy(data: Dictionary) -> Node:
 ## carries Resources/PackedScenes/Vector3 directly elsewhere in this file.
 func _spawn_loot(data: Dictionary) -> Node:
 	var loot: StaticBody3D = load(LOOT_SCENE).instantiate()
-	loot.item_id = data.item_id
+	loot.item_instance = data.item_instance
 	loot.name = "Loot_%d" % int(data.loot_index)
 	loot.position = Vector3(data.pos_x, data.pos_y, data.pos_z)
 	return loot
@@ -293,17 +293,23 @@ func apply_cone_hit(origin: Vector3, forward: Vector3, range: float, cone_degree
 
 ## Server-only: drop a pickup at `drop_position`, replicated to every peer via
 ## the loot MultiplayerSpawner. Called by enemy.gd.on_died.
-func spawn_loot_drop(drop_position: Vector3, item_id: StringName) -> void:
+func spawn_loot_drop(drop_position: Vector3, instance: Dictionary) -> void:
 	if not NetworkMode.is_server():
 		return
 	_loot_spawner.spawn({
 		"loot_index": _loot_counter,
-		"item_id": item_id,
+		"item_instance": instance,
 		"pos_x": drop_position.x,
 		"pos_y": drop_position.y,
 		"pos_z": drop_position.z,
 	})
 	_loot_counter += 1
+
+
+## Server-only: rolls `loot_table` against the shared combat RNG. Called by
+## enemy.gd.on_died — _combat_rng stays private to this file.
+func roll_loot(loot_table: LootTable) -> Array[Dictionary]:
+	return LootRollSystem.roll(loot_table, _combat_rng)
 
 
 ## Called on every peer (from enemy.gd.on_died, broadcast) when the dragon

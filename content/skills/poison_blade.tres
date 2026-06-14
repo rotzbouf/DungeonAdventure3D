@@ -1,0 +1,16 @@
+[gd_resource type="Resource" script_class="Skill" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/skill.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = &"poison_blade"
+display_name = "Poison Blade"
+mp_cost = 12
+cooldown_seconds = 3.0
+xp_reward = 30
+range = 1.5
+damage_base = 18
+inflict_status = &"poison"
+inflict_status_duration = 4.0
+inflict_status_magnitude = 2.0

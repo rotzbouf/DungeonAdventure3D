@@ -23,11 +23,12 @@ signal equip_rejected(reason: String)
 ## equipped_slots dict.
 signal equipment_changed(slots: Dictionary)
 
-## slot -> equipped item id, e.g. {&"main_hand": &"sword"}. Replicated via
-## player.gd._setup_replication with REPLICATION_MODE_ON_CHANGE (spawn=true)
-## so late joiners reconstruct it with zero history replay — see the `set`
-## below for how that reconciles into visuals.
-var equipped_slots: Dictionary[StringName, StringName] = {}:
+## slot -> equipped item instance (item_instance_system.gd), e.g.
+## {&"main_hand": {"iid": ..., "id": &"sword", "rarity": &"common", "affixes": {}}}.
+## Replicated via player.gd._setup_replication with REPLICATION_MODE_ON_CHANGE
+## (spawn=true) so late joiners reconstruct it with zero history replay — see
+## the `set` below for how that reconciles into visuals.
+var equipped_slots: Dictionary[StringName, Dictionary] = {}:
 	set(value):
 		equipped_slots = value
 		# A dedicated server has nothing to attach a visual to (headless) and is the
@@ -47,11 +48,11 @@ var equipped_slots: Dictionary[StringName, StringName] = {}:
 ## frees the previous visual instead of stacking weapons on the same bone.
 var _attachments: Dictionary[StringName, BoneAttachment3D] = {}
 
-## slot -> item id currently shown, independent of `equipped_slots` so
-## _attach_visual_for_slot stays idempotent regardless of whether the
-## replicated-property setter or the on_equip_changed RPC observes a given
-## change first (both can fire for the same change — see the plan).
-var _attached_items: Dictionary[StringName, StringName] = {}
+## slot -> iid of the instance currently shown, independent of
+## `equipped_slots` so _attach_visual_for_slot stays idempotent regardless of
+## whether the replicated-property setter or the on_equip_changed RPC observes
+## a given change first (both can fire for the same change — see the plan).
+var _attached_items: Dictionary[StringName, String] = {}
 
 ## NOT cached via @onready: the spawn-snapshot reconciliation in the
 ## `equipped_slots` setter above can fire on a freshly-instantiated late-
@@ -79,34 +80,38 @@ const UNARMED_ATTACK_RANGE := 1.6
 
 ## The equipped main_hand EquipmentItem, or null when unarmed.
 func weapon() -> EquipmentItem:
-	var item_id: StringName = equipped_slots.get(&"main_hand", &"")
-	if item_id == &"":
+	var instance: Dictionary = equipped_slots.get(&"main_hand", {})
+	if instance.is_empty():
 		return null
-	return GameDatabase.items.get(item_id)
+	return ItemInstanceSystem.base_item(instance)
 
 
 func weapon_attack_damage() -> int:
-	var item := weapon()
-	return item.attack_damage if item != null else UNARMED_ATTACK_DAMAGE
+	var instance: Dictionary = equipped_slots.get(&"main_hand", {})
+	if instance.is_empty():
+		return UNARMED_ATTACK_DAMAGE
+	return int(ItemInstanceSystem.total_stat(instance, &"attack_damage"))
 
 
 func weapon_attack_interval() -> float:
-	var item := weapon()
-	return item.attack_interval if item != null else UNARMED_ATTACK_INTERVAL
+	var instance: Dictionary = equipped_slots.get(&"main_hand", {})
+	if instance.is_empty():
+		return UNARMED_ATTACK_INTERVAL
+	return ItemInstanceSystem.total_stat(instance, &"attack_interval")
 
 
 func weapon_attack_range() -> float:
-	var item := weapon()
-	return item.attack_range if item != null else UNARMED_ATTACK_RANGE
+	var instance: Dictionary = equipped_slots.get(&"main_hand", {})
+	if instance.is_empty():
+		return UNARMED_ATTACK_RANGE
+	return ItemInstanceSystem.total_stat(instance, &"attack_range")
 
 
 ## Flat attack added on top of a skill/spell's authored damage_base.
 func total_attack_bonus() -> int:
 	var total := 0
 	for slot in equipped_slots:
-		var item: EquipmentItem = GameDatabase.items.get(equipped_slots[slot])
-		if item != null:
-			total += item.attack_damage
+		total += int(ItemInstanceSystem.total_stat(equipped_slots[slot], &"attack_damage"))
 	return total
 
 
@@ -114,18 +119,14 @@ func total_attack_bonus() -> int:
 func total_armor() -> int:
 	var total := 0
 	for slot in equipped_slots:
-		var item: EquipmentItem = GameDatabase.items.get(equipped_slots[slot])
-		if item != null:
-			total += item.armor
+		total += int(ItemInstanceSystem.total_stat(equipped_slots[slot], &"armor"))
 	return total
 
 
 func total_crit_chance() -> float:
 	var total := CombatSystem.BASE_CRIT_CHANCE
 	for slot in equipped_slots:
-		var item: EquipmentItem = GameDatabase.items.get(equipped_slots[slot])
-		if item != null:
-			total += item.crit_chance_bonus
+		total += ItemInstanceSystem.total_stat(equipped_slots[slot], &"crit_chance_bonus")
 	return total
 
 
@@ -134,7 +135,7 @@ func total_crit_chance() -> float:
 ## call to the same node path on the server — mirrors
 ## player_input.gd.request_move_to / world.gd.request_create_character.
 @rpc("any_peer", "call_local", "reliable")
-func request_equip(item_id: StringName) -> void:
+func request_equip(iid: String) -> void:
 	if not NetworkMode.is_server():
 		return
 	var sender_id: int = multiplayer.get_remote_sender_id()
@@ -142,15 +143,17 @@ func request_equip(item_id: StringName) -> void:
 		push_warning("equipment_component: rejected equip request from non-owning peer %d" % sender_id)
 		return
 	var inventory: Node = _player().get_node_or_null("InventoryComponent")
-	if inventory == null or item_id not in inventory.items:
+	var index := ItemInstanceSystem.find_index_by_iid(inventory.items, iid) if inventory != null else -1
+	if index == -1:
 		on_equip_rejected.rpc_id(sender_id, "You don't have that item.")
 		return
-	var item: Resource = GameDatabase.items.get(item_id)
+	var instance: Dictionary = inventory.items[index]
+	var item: Resource = ItemInstanceSystem.base_item(instance)
 	if not (item is EquipmentItem):
 		on_equip_rejected.rpc_id(sender_id, "That item can't be equipped.")
 		return
 	var slot: StringName = item.slot
-	var reason := EquipValidationSystem.can_equip(item_id, slot)
+	var reason := EquipValidationSystem.can_equip(instance.id, slot)
 	if reason != "":
 		on_equip_rejected.rpc_id(sender_id, reason)
 		return
@@ -158,14 +161,14 @@ func request_equip(item_id: StringName) -> void:
 	# slot goes back to the bag. Whole-array assignment (not in-place) so the
 	# InventoryComponent.items setter fires on a listen host too (lesson 22) —
 	# on a dedicated server the setter no-ops but the value still replicates.
-	var bag: Array[StringName] = inventory.items.duplicate()
-	bag.erase(item_id)
-	var previous: StringName = equipped_slots.get(slot, &"")
-	if previous != &"":
+	var bag: Array[Dictionary] = inventory.items.duplicate()
+	bag.remove_at(index)
+	var previous: Dictionary = equipped_slots.get(slot, {})
+	if not previous.is_empty():
 		bag.append(previous)
 	inventory.items = bag
-	equipped_slots[slot] = item_id
-	on_equip_changed.rpc(slot, item_id)
+	equipped_slots[slot] = instance
+	on_equip_changed.rpc(slot, instance)
 
 
 ## Client -> server: "unequip this slot back into my bag".
@@ -177,13 +180,13 @@ func request_unequip(slot: StringName) -> void:
 	if sender_id != _player().owning_peer_id():
 		push_warning("equipment_component: rejected unequip request from non-owning peer %d" % sender_id)
 		return
-	var item_id: StringName = equipped_slots.get(slot, &"")
-	if item_id == &"":
+	var instance: Dictionary = equipped_slots.get(slot, {})
+	if instance.is_empty():
 		return  # nothing equipped there
 	var inventory: Node = _player().get_node_or_null("InventoryComponent")
 	if inventory != null:
-		var bag: Array[StringName] = inventory.items.duplicate()
-		bag.append(item_id)
+		var bag: Array[Dictionary] = inventory.items.duplicate()
+		bag.append(instance)
 		inventory.items = bag
 	equipped_slots.erase(slot)
 	on_unequip.rpc(slot)
@@ -196,11 +199,11 @@ func request_unequip(slot: StringName) -> void:
 ## clients also get the visual via the replication setter; _attached_items
 ## keeps the double-drive idempotent.
 @rpc("authority", "call_local", "reliable")
-func on_equip_changed(slot: StringName, item_id: StringName) -> void:
+func on_equip_changed(slot: StringName, instance: Dictionary) -> void:
 	if NetworkMode.is_dedicated_server():
 		return
-	equipped_slots[slot] = item_id
-	_attach_visual_for_slot(slot, item_id)
+	equipped_slots[slot] = instance
+	_attach_visual_for_slot(slot, instance)
 	equipment_changed.emit(equipped_slots)
 
 
@@ -226,8 +229,9 @@ func on_equip_rejected(reason: String) -> void:
 ## race -> attachment bone purely from ids (GameDatabase + race_id) — never
 ## from anything that crossed the network directly, mirroring how
 ## model_view.gd re-resolves race_id -> visual_scene locally on every peer.
-func _attach_visual_for_slot(slot: StringName, item_id: StringName) -> void:
-	if _attached_items.get(slot) == item_id:
+func _attach_visual_for_slot(slot: StringName, instance: Dictionary) -> void:
+	var iid: String = instance.get("iid", "")
+	if _attached_items.get(slot) == iid:
 		return
 
 	var player := _player()
@@ -240,16 +244,16 @@ func _attach_visual_for_slot(slot: StringName, item_id: StringName) -> void:
 		# _ready class of ordering hazard in lessons_multiplayer_replication.
 		# Retry once this frame's spawn/_ready chain has finished;
 		# _attached_items keeps the retry idempotent either way.
-		call_deferred("_attach_visual_for_slot", slot, item_id)
+		call_deferred("_attach_visual_for_slot", slot, instance)
 		return
 
 	_detach_visual_for_slot(slot)
 
-	var item: EquipmentItem = GameDatabase.items.get(item_id)
+	var item: EquipmentItem = ItemInstanceSystem.base_item(instance)
 	var race: RaceModel = GameDatabase.races.get(player.race_id)
 	var bone_name: StringName = race.attachment_points.get(slot, &"") if race != null else &""
 	if item == null or item.visual_scene == null or bone_name == &"":
-		push_warning("equipment_component: cannot attach %s to slot %s (missing item visual or attachment bone)" % [item_id, slot])
+		push_warning("equipment_component: cannot attach %s to slot %s (missing item visual or attachment bone)" % [instance.get("id", &""), slot])
 		return
 
 	var attachment := BoneAttachment3D.new()
@@ -258,7 +262,7 @@ func _attach_visual_for_slot(slot: StringName, item_id: StringName) -> void:
 	attachment.add_child(item.visual_scene.instantiate())
 
 	_attachments[slot] = attachment
-	_attached_items[slot] = item_id
+	_attached_items[slot] = iid
 
 
 ## Frees the BoneAttachment3D currently representing `slot` (if any) and clears

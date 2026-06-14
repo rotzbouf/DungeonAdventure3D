@@ -9,9 +9,8 @@ extends Resource
 @export var aggro_radius: float = 6.0
 @export var attack_range: float = 1.5
 @export var xp_reward: int = 20
-## Item id carried by the loot drop spawned on death (M10 will resolve this
-## against an item content table; M9 just prints it on pickup).
-@export var loot_item_id: StringName = &""
+## Loot table (content/loot_tables/*.tres) rolled on death (M16).
+@export var loot_table: LootTable = null
 @export var visual_scene: PackedScene
 
 ## Combat variety (M15). Inert defaults — content gives each enemy a

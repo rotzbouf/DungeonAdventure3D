@@ -38,11 +38,11 @@ func request_buy_item(shop_id: StringName, item_id: StringName) -> void:
 		return
 
 	_stats.gold -= item.value
-	_inventory.add_item(item_id)
+	_inventory.add_item(ItemInstanceSystem.create(item_id))
 
 
 @rpc("any_peer", "call_local", "reliable")
-func request_sell_item(item_id: StringName) -> void:
+func request_sell_item(iid: String) -> void:
 	if not NetworkMode.is_server():
 		return
 	var sender_id: int = multiplayer.get_remote_sender_id()
@@ -51,17 +51,14 @@ func request_sell_item(item_id: StringName) -> void:
 		push_warning("shop_component: rejected sell request from non-owning peer %d" % sender_id)
 		return
 
-	if item_id not in _inventory.items:
+	var index := ItemInstanceSystem.find_index_by_iid(_inventory.items, iid)
+	if index == -1:
 		on_trade_rejected.rpc_id(sender_id, "Item not in inventory")
 		return
 
-	var item: Resource = GameDatabase.items.get(item_id)
-	if item == null:
-		on_trade_rejected.rpc_id(sender_id, "Unknown item")
-		return
-
-	_inventory.items.erase(item_id)
-	_stats.gold += item.value / 2
+	var instance: Dictionary = _inventory.items[index]
+	_inventory.items.remove_at(index)
+	_stats.gold += ItemInstanceSystem.sell_value(instance)
 
 
 @rpc("authority", "call_local", "reliable")

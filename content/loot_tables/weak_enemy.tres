@@ -1,0 +1,14 @@
+[gd_resource type="Resource" script_class="LootTable" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/loot_table.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = &"weak_enemy"
+item_weights = {
+&"health_potion": 6.0,
+&"sword": 1.0,
+&"elven_dagger": 1.0
+}
+rolls = 1
+drop_chance = 0.35

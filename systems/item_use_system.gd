@@ -1,8 +1,8 @@
 class_name ItemUseSystem
 
 ## Returns "" on success, or a rejection reason string.
-static func can_use(item_id: StringName, items: Array[StringName]) -> String:
-	if not item_id in items:
+static func can_use(item_id: StringName, items: Array[Dictionary]) -> String:
+	if not items.any(func(i: Dictionary) -> bool: return i.id == item_id):
 		return "You don't have that item."
 	var item: Resource = GameDatabase.items.get(item_id)
 	if item == null or not (item is ConsumableItem):

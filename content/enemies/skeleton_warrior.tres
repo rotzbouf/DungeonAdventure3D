@@ -1,7 +1,8 @@
-[gd_resource type="Resource" script_class="EnemyDefinition" load_steps=3 format=3]
+[gd_resource type="Resource" script_class="EnemyDefinition" load_steps=4 format=3]
 
 [ext_resource type="Script" path="res://data/enemy_definition.gd" id="1"]
 [ext_resource type="PackedScene" path="res://entities/enemy/skeleton_visual.tscn" id="2"]
+[ext_resource type="Resource" path="res://content/loot_tables/weak_enemy.tres" id="3"]
 
 [resource]
 script = ExtResource("1")
@@ -13,6 +14,6 @@ move_speed = 2.5
 aggro_radius = 6.0
 attack_range = 1.5
 xp_reward = 20
-loot_item_id = &"bone_shard"
+loot_table = ExtResource("3")
 visual_scene = ExtResource("2")
 armor = 5

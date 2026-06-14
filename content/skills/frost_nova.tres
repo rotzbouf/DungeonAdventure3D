@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="Skill" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/skill.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = &"frost_nova"
+display_name = "Frost Nova"
+mp_cost = 14
+cooldown_seconds = 4.0
+xp_reward = 25
+range = 2.5
+damage_base = 12
+inflict_status = &"stun"
+inflict_status_duration = 1.5

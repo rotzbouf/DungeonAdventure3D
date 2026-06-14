@@ -6,10 +6,13 @@ extends StaticBody3D
 ## rpc_id(1, ...) pattern. request_pickup grants the item to the requesting
 ## peer's InventoryComponent and despawns.
 
+const LootGlowScene := preload("res://entities/vfx/loot_glow.tscn")
+
 ## Set by world.gd._spawn_loot on the freshly instantiated node, BEFORE it
 ## enters the tree — same deterministic-reconstruction pattern as
-## enemy.gd.definition_id.
-var item_id: StringName = &""
+## enemy.gd.definition_id. An item instance (item_instance_system.gd): {"iid":
+## ..., "id": ..., "rarity": ..., "affixes": {...}} (M16).
+var item_instance: Dictionary = {}
 
 ## Server-only: guards against a second request_pickup arriving before
 ## queue_free() (deferred) actually removes this node.
@@ -17,10 +20,13 @@ var _picked_up: bool = false
 
 
 func _ready() -> void:
-	var item: Resource = GameDatabase.items.get(item_id)
+	var item: Resource = ItemInstanceSystem.base_item(item_instance)
 	if item != null and "visual_scene" in item and item.visual_scene != null:
 		$MeshInstance3D.visible = false
 		add_child(item.visual_scene.instantiate())
+	var glow := LootGlowScene.instantiate()
+	add_child(glow)
+	glow.set_rarity(item_instance.get("rarity", &"common"))
 
 
 func interact(_player: Node) -> void:
@@ -38,5 +44,5 @@ func request_pickup() -> void:
 	if inventory == null:
 		return
 	_picked_up = true
-	inventory.add_item(item_id)
+	inventory.add_item(item_instance)
 	queue_free()

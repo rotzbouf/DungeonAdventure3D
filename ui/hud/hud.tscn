@@ -1,4 +1,4 @@
-[gd_scene load_steps=10 format=3]
+[gd_scene load_steps=11 format=3]
 
 [ext_resource type="Script" path="res://ui/hud/hud.gd" id="1"]
 [ext_resource type="PackedScene" path="res://ui/hud/stats_bar/stats_bar.tscn" id="2"]
@@ -13,6 +13,7 @@
 [ext_resource type="PackedScene" path="res://ui/hud/death_overlay/death_overlay.tscn" id="11"]
 [ext_resource type="PackedScene" path="res://ui/hud/shop/shop_panel.tscn" id="12"]
 [ext_resource type="PackedScene" path="res://ui/hud/storage/storage_panel.tscn" id="13"]
+[ext_resource type="PackedScene" path="res://ui/hud/level_up/level_up_overlay.tscn" id="14"]
 
 [node name="HUD" type="CanvasLayer"]
 script = ExtResource("1")
@@ -50,4 +51,7 @@ theme = ExtResource("8")
 theme = ExtResource("8")
 
 [node name="StoragePanel" parent="." instance=ExtResource("13")]
+theme = ExtResource("8")
+
+[node name="LevelUpOverlay" parent="." instance=ExtResource("14")]
 theme = ExtResource("8")

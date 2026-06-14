@@ -15,8 +15,9 @@ var _shop_component: Node
 var _inventory_component: Node
 var _shop_id: StringName = &""
 var _stock_ids: Array[StringName] = []
-## Unique item ids in display order, parallel to _inventory_list's rows.
-var _unique_inventory_ids: Array[StringName] = []
+## Representative iids (one per distinct base item id), parallel to
+## _inventory_list's rows.
+var _sell_iids: Array[String] = []
 
 
 func open_shop(shop_id: StringName, shop_component: Node, inventory_component: Node) -> void:
@@ -51,23 +52,32 @@ func _refresh_stock() -> void:
 		_stock_list.set_item_custom_fg_color(row, Rarity.color_for(item))
 
 
-func _on_inventory_changed(items: Array[StringName]) -> void:
-	var counts: Dictionary = {}
-	_unique_inventory_ids.clear()
-	for id in items:
-		if id not in counts:
-			_unique_inventory_ids.append(id)
-		counts[id] = counts.get(id, 0) + 1
+## Groups by base item id (instance.id) -- the shop only cares about "what
+## kind of item is this" for buy-back display, not its rolled rarity/affixes.
+## The sell price shown is the representative instance's own sell_value, which
+## may understate a mixed group containing higher-rarity rolls.
+func _on_inventory_changed(items: Array[Dictionary]) -> void:
+	var groups: Dictionary = {}
+	var order: Array[StringName] = []
+	for instance: Dictionary in items:
+		var item_id: StringName = instance.get("id", &"")
+		if item_id not in groups:
+			order.append(item_id)
+			groups[item_id] = []
+		groups[item_id].append(instance)
 
+	_sell_iids.clear()
 	_inventory_list.clear()
-	for id in _unique_inventory_ids:
-		var item: Resource = GameDatabase.items.get(id)
-		var item_name: String = item.display_name if item != null else String(id)
-		var sell_price: int = (item.value / 2) if item != null else 0
-		var count: int = counts[id]
+	for item_id in order:
+		var group: Array = groups[item_id]
+		var representative: Dictionary = group[0]
+		var item_name := ItemInstanceSystem.display_name(representative)
+		var sell_price := ItemInstanceSystem.sell_value(representative)
+		var count: int = group.size()
 		var label := "%s - %d gold" % [item_name, sell_price]
 		var row := _inventory_list.add_item(label if count == 1 else "%s x%d" % [label, count])
-		_inventory_list.set_item_custom_fg_color(row, Rarity.color_for(item))
+		_inventory_list.set_item_custom_fg_color(row, Rarity.color_for(representative))
+		_sell_iids.append(representative.get("iid", ""))
 
 
 func _on_stock_list_item_activated(index: int) -> void:
@@ -77,9 +87,9 @@ func _on_stock_list_item_activated(index: int) -> void:
 
 
 func _on_inventory_list_item_activated(index: int) -> void:
-	if index < 0 or index >= _unique_inventory_ids.size():
+	if index < 0 or index >= _sell_iids.size():
 		return
-	_shop_component.request_sell_item.rpc_id(1, _unique_inventory_ids[index])
+	_shop_component.request_sell_item.rpc_id(1, _sell_iids[index])
 
 
 func _on_trade_rejected(reason: String) -> void:

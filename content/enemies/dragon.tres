@@ -1,7 +1,8 @@
-[gd_resource type="Resource" script_class="EnemyDefinition" load_steps=3 format=3]
+[gd_resource type="Resource" script_class="EnemyDefinition" load_steps=4 format=3]
 
 [ext_resource type="Script" path="res://data/enemy_definition.gd" id="1"]
 [ext_resource type="PackedScene" path="res://entities/enemy/boss/dragon_visual.tscn" id="2"]
+[ext_resource type="Resource" path="res://content/loot_tables/boss.tres" id="3"]
 
 [resource]
 script = ExtResource("1")
@@ -13,7 +14,7 @@ move_speed = 2.0
 aggro_radius = 12.0
 attack_range = 3.0
 xp_reward = 500
-loot_item_id = &""
+loot_table = ExtResource("3")
 visual_scene = ExtResource("2")
 is_boss = true
 phase2_hp_ratio = 0.5

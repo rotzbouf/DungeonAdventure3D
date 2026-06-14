@@ -95,9 +95,9 @@ func _on_died() -> void:
 func _drop_inventory_on_death() -> void:
 	var world := get_tree().root.find_child("World", true, false)
 	var death_position := global_position
-	for item_id: StringName in _inventory.items:
+	for instance: Dictionary in _inventory.items:
 		var offset := Vector3(randf_range(-0.75, 0.75), 0.0, randf_range(-0.75, 0.75))
-		world.spawn_loot_drop(death_position + offset, item_id)
+		world.spawn_loot_drop(death_position + offset, instance)
 	_inventory.items.clear()
 
 

@@ -6,6 +6,81 @@ project uses [Semantic Versioning](https://semver.org/) (`MAJOR.MINOR.PATCH`).
 
 ## [Unreleased]
 
+## [0.18.0] - 2026-06-14
+
+M16 "Loot & Progression": replaces the bare `StringName item_id` that has
+flowed through inventory/equipment/loot/storage/shop since M6 with a real
+**item instance** (unique id, base item, rolled rarity, affixes), then builds
+the loot and character-progression features on top of it — weighted loot
+tables with rarity tiers, random affixes on rare/uncommon gear, a rarity glow
+on drops, a real level-2 talent choice for every class, and an inventory
+details panel with stat breakdowns and gear comparisons.
+
+### Added
+- Item instances everywhere. New `systems/item_instance_system.gd`
+  (`ItemInstanceSystem`) is the central module: `create()` builds
+  `{"iid", "id", "rarity", "affixes"}`, plus `base_item`, `display_name`
+  (rarity-prefixed, affix-suffixed, e.g. "Rare Sword of Power of Haste"),
+  `total_stat` (base stat + matching affix magnitudes), `signature` (for
+  inventory stacking), `sell_value` (`base.value * {common:1, uncommon:1.5,
+  rare:2.5}[rarity] / 2`), and `find_index_by_iid`.
+  `InventoryComponent.items`, `EquipmentComponent.equipped_slots`,
+  `StorageChest`'s stored items, loot drops, and shop buy/sell all carry
+  instance `Dictionary`s now (`Array[Dictionary]` /
+  `Dictionary[StringName, Dictionary]` replicate over
+  `SceneReplicationConfig` and `MultiplayerSpawner` spawn-data unchanged).
+- Loot tables and rarity rolls. New `data/loot_table.gd` (`LootTable`:
+  item weights, rarity weights, rolls, drop chance) and
+  `systems/loot_roll_system.gd` (`LootRollSystem.roll`), wired through
+  `world.gd.roll_loot` (server-only, uses the existing `_combat_rng`).
+  Three tables in `content/loot_tables/` (`weak_enemy`, `tough_enemy`,
+  `boss`) replace the old single hardcoded `loot_item_id` on
+  goblin/skeleton/zombie/dragon — kills now drop 0-3 items with
+  common/uncommon/rare odds skewed by enemy toughness.
+- Affixes. New `data/affix_definition.gd` (`AffixDefinition`) and four
+  `content/affixes/*.tres` (`of_power`, `of_brutality`, `of_precision`,
+  `of_haste`), each a ranged bonus to one of `attack_damage`/`armor`/
+  `crit_chance_bonus`/`attack_interval`. `LootRollSystem` rolls 0/1/2
+  distinct-stat affixes for common/uncommon/rare equipment drops.
+  `GameDatabase` gains `affixes` and `loot_tables` categories.
+- Rarity glow on loot drops. New `entities/vfx/loot_glow.tscn` /
+  `loot_glow.gd` — a pulsing colored light + sparkle particles, tinted by
+  `Rarity.COLORS` and hidden for common drops, attached to every
+  `loot_drop.gd` instance.
+- Level-2 talent choices for every class. New
+  `SkillUnlockSystem.choices_at(class_def, level)` offers a 2-option pick at
+  level 2 (warrior: `shield_bash`/`cleave`, rogue: `evasion`/`poison_blade`,
+  mage: `arcane_bolt`/`frost_nova` — mage previously got nothing at level 2).
+  Four new skills in `content/skills/` reuse the existing `Skill` schema and
+  `stun`/`poison` status effects, no new combat mechanics.
+  `LevelComponent` gains server-only `_pending_choices`, a targeted
+  `on_level_up_choice` RPC, and `request_choose_skill` to resolve a pick into
+  `SkillComponent.known_skill_ids`. New `ui/hud/level_up/level_up_overlay.tscn`
+  /`.gd` shows the choice modally and is wired up in `hud.gd`.
+- Inventory details panel. Single-clicking any row in
+  `inventory_panel.gd` now shows a rarity-colored name, non-zero base stats,
+  one line per affix bonus, sell value, and — for equipment with something
+  already worn in the same slot — a `+`/`-` colored stat-delta comparison
+  against the equipped item.
+
+### Fixed
+- `Rarity.color_for` is duck-typed on `item.get("rarity")`; call sites in
+  `inventory_panel.gd` and `shop_panel.gd` were passing the base item
+  Resource (its *authored default* rarity, e.g. always `common` for a sword)
+  instead of the rolled instance Dictionary, so rare/uncommon drops never
+  rendered in their rarity color. Fixed by passing the instance directly.
+
+### Verified
+- Listen host (`./run.sh --host`): seeded a bag with a common potion, a rare
+  sword rolled with `of_power`/`of_haste` affixes, and an equipped common
+  axe (temp hook, removed). Inventory panel shows the rare sword's full name
+  in rare-blue in both the bag list and the details panel; details panel
+  shows base stats, both affix bonus lines, `Value: 62 gold` (matching the
+  2.5x rare sell multiplier), and a correct stat-delta comparison against
+  the equipped axe (attack damage down, crit chance and attack speed up).
+- Headless dedicated boot (`--server`) clean: `GameDatabase: loaded 36
+  content resources`, zero errors/warnings.
+
 ## [0.17.1] - 2026-06-13
 
 Completes M15: makes equipped gear reachable. M15 gave weapons combat stats and

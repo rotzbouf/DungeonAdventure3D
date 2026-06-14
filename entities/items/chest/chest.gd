@@ -30,4 +30,4 @@ func on_chest_opened() -> void:
 	if NetworkMode.is_server():
 		var world := get_parent()
 		for item_id in loot_item_ids:
-			world.spawn_loot_drop(global_position + Vector3(0, 0.6, 0.6), item_id)
+			world.spawn_loot_drop(global_position + Vector3(0, 0.6, 0.6), ItemInstanceSystem.create(item_id))

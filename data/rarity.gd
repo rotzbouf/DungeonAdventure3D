@@ -11,8 +11,10 @@ const COLORS: Dictionary[StringName, Color] = {
 }
 
 
-## Duck-typed: ConsumableItem and other non-equipment resources carry no
-## rarity field and read as common.
+## Duck-typed: pass an item INSTANCE Dictionary (its "rarity" is the rolled
+## rarity) when one exists, since a base item Resource only carries its
+## authored default rarity. ConsumableItem and other non-equipment resources
+## carry no rarity field and read as common.
 static func color_for(item) -> Color:
 	if item == null:
 		return COLORS[&"common"]

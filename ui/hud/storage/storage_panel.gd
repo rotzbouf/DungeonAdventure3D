@@ -11,8 +11,10 @@ extends PanelContainer
 
 var _storage_chest: Node
 var _inventory_component: Node
-var _unique_inventory_ids: Array[StringName] = []
-var _unique_storage_ids: Array[StringName] = []
+## Representative iids (one per ItemInstanceSystem.signature group), parallel
+## to each list's rows.
+var _inventory_iids: Array[String] = []
+var _storage_iids: Array[String] = []
 
 
 func open_storage(storage_chest: Node, inventory_component: Node) -> void:
@@ -32,41 +34,48 @@ func open_storage(storage_chest: Node, inventory_component: Node) -> void:
 	_storage_chest.request_open_storage.rpc_id(1)
 
 
-func _on_inventory_changed(items: Array[StringName]) -> void:
-	_unique_inventory_ids = _populate_list(_inventory_list, items)
+func _on_inventory_changed(items: Array[Dictionary]) -> void:
+	_inventory_iids = _populate_list(_inventory_list, items)
 
 
-func _on_storage_updated(items: Array[StringName]) -> void:
-	_unique_storage_ids = _populate_list(_storage_list, items)
+func _on_storage_updated(items: Array[Dictionary]) -> void:
+	_storage_iids = _populate_list(_storage_list, items)
 
 
-func _populate_list(list: ItemList, items: Array[StringName]) -> Array[StringName]:
-	var counts: Dictionary = {}
-	var unique_ids: Array[StringName] = []
-	for id in items:
-		if id not in counts:
-			unique_ids.append(id)
-		counts[id] = counts.get(id, 0) + 1
+## Groups by ItemInstanceSystem.signature so identical commons stack
+## ("Health Potion x3") but two differently-rolled rares show separately.
+func _populate_list(list: ItemList, items: Array[Dictionary]) -> Array[String]:
+	var groups: Dictionary = {}
+	var order: Array[String] = []
+	for instance: Dictionary in items:
+		var sig := ItemInstanceSystem.signature(instance)
+		if sig not in groups:
+			order.append(sig)
+			groups[sig] = []
+		groups[sig].append(instance)
 
 	list.clear()
-	for id in unique_ids:
-		var item: Resource = GameDatabase.items.get(id)
-		var item_name: String = item.display_name if item != null else String(id)
-		var count: int = counts[id]
+	var iids: Array[String] = []
+	for sig in order:
+		var group: Array = groups[sig]
+		var representative: Dictionary = group[0]
+		var item_name := ItemInstanceSystem.display_name(representative)
+		var count: int = group.size()
 		list.add_item(item_name if count == 1 else "%s x%d" % [item_name, count])
-	return unique_ids
+		iids.append(representative.get("iid", ""))
+	return iids
 
 
 func _on_inventory_list_item_activated(index: int) -> void:
-	if index < 0 or index >= _unique_inventory_ids.size():
+	if index < 0 or index >= _inventory_iids.size():
 		return
-	_storage_chest.request_deposit_item.rpc_id(1, _unique_inventory_ids[index])
+	_storage_chest.request_deposit_item.rpc_id(1, _inventory_iids[index])
 
 
 func _on_storage_list_item_activated(index: int) -> void:
-	if index < 0 or index >= _unique_storage_ids.size():
+	if index < 0 or index >= _storage_iids.size():
 		return
-	_storage_chest.request_withdraw_item.rpc_id(1, _unique_storage_ids[index])
+	_storage_chest.request_withdraw_item.rpc_id(1, _storage_iids[index])
 
 
 func _on_close_button_pressed() -> void:

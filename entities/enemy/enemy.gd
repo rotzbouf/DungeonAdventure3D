@@ -97,9 +97,10 @@ func on_died() -> void:
 	if NetworkMode.is_server():
 		if def != null:
 			_award_kill_xp(def.xp_reward)
-			if def.loot_item_id != &"":
+			if def.loot_table != null:
 				var world := get_tree().root.find_child("World", true, false)
-				world.spawn_loot_drop(global_position, def.loot_item_id)
+				for instance in world.roll_loot(def.loot_table):
+					world.spawn_loot_drop(global_position, instance)
 		get_tree().create_timer(0.6).timeout.connect(queue_free)
 
 
