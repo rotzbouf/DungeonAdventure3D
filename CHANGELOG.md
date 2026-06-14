@@ -6,6 +6,24 @@ project uses [Semantic Versioning](https://semver.org/) (`MAJOR.MINOR.PATCH`).
 
 ## [Unreleased]
 
+## [0.18.3] - 2026-06-14
+
+### Changed
+- Reworked dungeon room/corridor placement from 9 hand-placed
+  `Transform3D` matrices (kept in sync by hand with a separately
+  hardcoded `_dungeon_cells()` grid) into one declarative
+  `DUNGEON_LAYOUT` table in `world.gd` that drives both the
+  instantiated piece transforms and the walkable cell grid via a
+  shared `ROTATION_BASES`/`PIECE_FOOTPRINTS`/`_rotate_cell` model.
+- Fixed EntryRoom (`room-corner.glb`): its open corner/notch was
+  rotated 180° so it now sits between the CorridorE1 (east) and
+  CorridorS1 (south) connections instead of facing away into unused
+  space - the misalignment the entrance area had since the dungeon
+  was first laid out.
+- Relocated `Torch2` (Props) from the entry room's SE corner to its
+  NW corner, since the 180° rotation moved the open/no-floor notch
+  into the SE corner where the torch used to sit.
+
 ## [0.18.2] - 2026-06-14
 
 ### Changed

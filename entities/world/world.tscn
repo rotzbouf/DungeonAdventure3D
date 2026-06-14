@@ -1,14 +1,9 @@
-[gd_scene load_steps=38 format=3]
+[gd_scene load_steps=33 format=3]
 
 [ext_resource type="Script" path="res://entities/world/world.gd" id="1"]
 [ext_resource type="Script" path="res://entities/world/environment_controller.gd" id="32"]
 [ext_resource type="Script" path="res://entities/items/scroll/spell_scroll.gd" id="2"]
 [ext_resource type="PackedScene" path="res://entities/items/chest/chest.tscn" id="16"]
-[ext_resource type="PackedScene" path="res://entities/dungeon/kenney/room-corner.glb" id="3"]
-[ext_resource type="PackedScene" path="res://entities/dungeon/kenney/corridor.glb" id="4"]
-[ext_resource type="PackedScene" path="res://entities/dungeon/kenney/room-small.glb" id="5"]
-[ext_resource type="PackedScene" path="res://entities/dungeon/kenney/corridor-intersection.glb" id="6"]
-[ext_resource type="PackedScene" path="res://entities/dungeon/kenney/room-wide.glb" id="7"]
 [ext_resource type="PackedScene" path="res://entities/dungeon/props/Prop_Torch.tscn" id="8"]
 [ext_resource type="PackedScene" path="res://entities/dungeon/props/Prop_Barrel.tscn" id="9"]
 [ext_resource type="PackedScene" path="res://entities/dungeon/props/Prop_Crate.tscn" id="10"]
@@ -90,32 +85,6 @@ script = ExtResource("32")
 
 [node name="DungeonLevel" type="Node3D" parent="NavigationRegion3D"]
 
-[node name="EntryRoom" parent="NavigationRegion3D/DungeonLevel" instance=ExtResource("3")]
-
-[node name="CorridorE1" parent="NavigationRegion3D/DungeonLevel" instance=ExtResource("4")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8, 0, 0)
-
-[node name="SideRoomA" parent="NavigationRegion3D/DungeonLevel" instance=ExtResource("5")]
-transform = Transform3D(0, 0, 1, 0, 1, 0, -1, 0, 0, 16, 0, 0)
-
-[node name="CorridorS1" parent="NavigationRegion3D/DungeonLevel" instance=ExtResource("4")]
-transform = Transform3D(0, 0, -1, 0, 1, 0, 1, 0, 0, 0, 0, 8)
-
-[node name="Hub" parent="NavigationRegion3D/DungeonLevel" instance=ExtResource("6")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 12)
-
-[node name="CorridorE2" parent="NavigationRegion3D/DungeonLevel" instance=ExtResource("4")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4, 0, 12)
-
-[node name="SideRoomB" parent="NavigationRegion3D/DungeonLevel" instance=ExtResource("5")]
-transform = Transform3D(0, 0, 1, 0, 1, 0, -1, 0, 0, 12, 0, 12)
-
-[node name="CorridorS2" parent="NavigationRegion3D/DungeonLevel" instance=ExtResource("4")]
-transform = Transform3D(0, 0, -1, 0, 1, 0, 1, 0, 0, 0, 0, 16)
-
-[node name="BossChamber" parent="NavigationRegion3D/DungeonLevel" instance=ExtResource("7")]
-transform = Transform3D(0, 0, -1, 0, 1, 0, 1, 0, 0, 0, 0, 28)
-
 [node name="TownNavigationRegion3D" type="NavigationRegion3D" parent="."]
 
 [node name="Town" type="Node3D" parent="."]
@@ -193,7 +162,7 @@ target_position = Vector3(-41, 0, -4)
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -5, 0, -1)
 
 [node name="Torch2" parent="Props" instance=ExtResource("8")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 5, 0, 5)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -5, 0, -5)
 
 [node name="Barrel1" parent="Props" instance=ExtResource("9")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -5, 0, 5)

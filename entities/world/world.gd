@@ -80,6 +80,7 @@ func _enter_tree() -> void:
 
 
 func _ready() -> void:
+	_instantiate_dungeon_pieces(_navigation_region.get_node("DungeonLevel"))
 	_navigation_region.navigation_mesh = _build_dungeon_navigation_mesh()
 	_town_navigation_region.navigation_mesh = _build_town_navigation_mesh()
 	_build_floor_colliders()
@@ -327,44 +328,125 @@ func on_floor_cleared(xp_reward: int) -> void:
 	floor_cleared.emit(xp_reward)
 
 
+# --- Dungeon layout (declarative) ------------------------------------------
+#
+# DUNGEON_LAYOUT is the single source of truth for the dungeon's room/corridor
+# pieces: _dungeon_cells() (the walkable-footprint grid used by the nav mesh
+# and floor/wall colliders below) and _instantiate_dungeon_pieces() (the
+# actual GLB placements, replacing static nodes that used to live in
+# world.tscn) both derive from it, so a piece's position/rotation can never
+# drift out of sync between "what's walkable" and "what's rendered".
+#
+# ROTATION_BASES[r] is the Transform3D.basis for a rotation of r * 90 degrees
+# about Y. The same (x, z) mapping rotates integer cell offsets via
+# _rotate_cell(), since cell centers are just (cx, cz) * CELL_SIZE and the
+# mapping is linear - so a piece's mesh and its footprint cells always rotate
+# together.
+const ROTATION_BASES: Array[Basis] = [
+	Basis(Vector3(1, 0, 0), Vector3(0, 1, 0), Vector3(0, 0, 1)),    # r=0: (x,z) -> (x,z)
+	Basis(Vector3(0, 0, 1), Vector3(0, 1, 0), Vector3(-1, 0, 0)),   # r=1: (x,z) -> (-z,x)
+	Basis(Vector3(-1, 0, 0), Vector3(0, 1, 0), Vector3(0, 0, -1)),  # r=2: (x,z) -> (-x,-z)
+	Basis(Vector3(0, 0, -1), Vector3(0, 1, 0), Vector3(1, 0, 0)),   # r=3: (x,z) -> (z,-x)
+]
+
+const ROOM_CORNER_SCENE := preload("res://entities/dungeon/kenney/room-corner.glb")
+const CORRIDOR_SCENE := preload("res://entities/dungeon/kenney/corridor.glb")
+const ROOM_SMALL_SCENE := preload("res://entities/dungeon/kenney/room-small.glb")
+const INTERSECTION_SCENE := preload("res://entities/dungeon/kenney/corridor-intersection.glb")
+const ROOM_WIDE_SCENE := preload("res://entities/dungeon/kenney/room-wide.glb")
+
+# Local cell footprints (centered on each piece's own origin, before
+# rotation/translation), derived from each GLB's mesh AABB. room_corner is
+# the only piece with a "notch" - the namesake cut-away corner with no floor
+# geometry, listed separately so rotation carries it along with the piece.
+const PIECE_FOOTPRINTS := {
+	"corridor": {"cells": [Vector2i(0, 0)]},
+	"intersection": {"cells": [Vector2i(0, 0)]},
+	"room_small": {"cells": [
+		Vector2i(-1, -1), Vector2i(0, -1), Vector2i(1, -1),
+		Vector2i(-1, 0), Vector2i(0, 0), Vector2i(1, 0),
+		Vector2i(-1, 1), Vector2i(0, 1), Vector2i(1, 1),
+	]},
+	"room_wide": {"cells": [
+		Vector2i(-2, -1), Vector2i(-1, -1), Vector2i(0, -1), Vector2i(1, -1), Vector2i(2, -1),
+		Vector2i(-2, 0), Vector2i(-1, 0), Vector2i(0, 0), Vector2i(1, 0), Vector2i(2, 0),
+		Vector2i(-2, 1), Vector2i(-1, 1), Vector2i(0, 1), Vector2i(1, 1), Vector2i(2, 1),
+	]},
+	"room_corner": {
+		"cells": [
+			Vector2i(0, -1), Vector2i(1, -1),
+			Vector2i(-1, 0), Vector2i(0, 0), Vector2i(1, 0),
+			Vector2i(-1, 1), Vector2i(0, 1), Vector2i(1, 1),
+		],
+		"notches": [Vector2i(-1, -1)],
+	},
+}
+
+# The dungeon's room/corridor pieces. `center` is the cell at the center of
+# the piece's bounding box (Transform3D.origin = center * CELL_SIZE); `rot`
+# is a ROTATION_BASES index (0-3).
+#
+# EntryRoom: rot=2 (180 degrees) rotates room_corner's notch from local
+# (-1,-1) to local (1,1), which - since center is (0,0) - moves the open
+# corner from world (-X,-Z) (facing empty space) to world (+X,+Z), between
+# the CorridorE1 (east) and CorridorS1 (south) connections. This is the
+# Entry Room misalignment fix.
+const DUNGEON_LAYOUT := [
+	{"name": "EntryRoom", "scene": ROOM_CORNER_SCENE, "piece": "room_corner", "center": Vector2i(0, 0), "rot": 2},
+	{"name": "CorridorE1", "scene": CORRIDOR_SCENE, "piece": "corridor", "center": Vector2i(2, 0), "rot": 0},
+	{"name": "SideRoomA", "scene": ROOM_SMALL_SCENE, "piece": "room_small", "center": Vector2i(4, 0), "rot": 1},
+	{"name": "CorridorS1", "scene": CORRIDOR_SCENE, "piece": "corridor", "center": Vector2i(0, 2), "rot": 3},
+	{"name": "Hub", "scene": INTERSECTION_SCENE, "piece": "intersection", "center": Vector2i(0, 3), "rot": 0},
+	{"name": "CorridorE2", "scene": CORRIDOR_SCENE, "piece": "corridor", "center": Vector2i(1, 3), "rot": 0},
+	{"name": "SideRoomB", "scene": ROOM_SMALL_SCENE, "piece": "room_small", "center": Vector2i(3, 3), "rot": 1},
+	{"name": "CorridorS2", "scene": CORRIDOR_SCENE, "piece": "corridor", "center": Vector2i(0, 4), "rot": 3},
+	{"name": "BossChamber", "scene": ROOM_WIDE_SCENE, "piece": "room_wide", "center": Vector2i(0, 7), "rot": 3},
+]
+
+
+## Rotates a cell offset by `rot` * 90 degrees, matching ROTATION_BASES[rot]'s
+## (x, z) mapping - so a piece's footprint cells rotate the same way as its
+## mesh.
+static func _rotate_cell(cell: Vector2i, rot: int) -> Vector2i:
+	match rot:
+		1: return Vector2i(-cell.y, cell.x)
+		2: return Vector2i(-cell.x, -cell.y)
+		3: return Vector2i(cell.y, -cell.x)
+		_: return cell
+
+
 ## Returns the (cell_x, cell_z) grid coordinates of every walkable cell in the
 ## dungeon, where cell (cx, cz) covers world space x in [cx*CELL_SIZE -
-## CELL_SIZE/2, cx*CELL_SIZE + CELL_SIZE/2] and likewise for z. This is the
-## single source of truth for the dungeon's walkable footprint, mirroring the
-## room/corridor placements in world.tscn.
+## CELL_SIZE/2, cx*CELL_SIZE + CELL_SIZE/2] and likewise for z. Derived from
+## DUNGEON_LAYOUT (see above): each piece's local footprint, minus any
+## notches, is rotated and translated to its placement.
 static func _dungeon_cells() -> Array[Vector2i]:
+	var seen := {}
 	var cells: Array[Vector2i] = []
-	# Entry Room (room-corner, 12x12) at grid origin. The room-corner mesh's
-	# southwest corner cell (-1,-1) is a cut-away notch with no floor geometry
-	# (the piece's namesake "corner" opening), so it's excluded here.
-	for cx in range(-1, 2):
-		for cz in range(-1, 2):
-			if cx == -1 and cz == -1:
+	for entry in DUNGEON_LAYOUT:
+		var footprint: Dictionary = PIECE_FOOTPRINTS[entry["piece"]]
+		var notches: Array = footprint.get("notches", [])
+		for local_cell in footprint["cells"]:
+			if local_cell in notches:
 				continue
-			cells.append(Vector2i(cx, cz))
-	# Corridor E1 -> Side Room A (room-small, 12x12).
-	cells.append(Vector2i(2, 0))
-	for cx in range(3, 6):
-		for cz in range(-1, 2):
-			cells.append(Vector2i(cx, cz))
-	# Corridor S1 -> Hub -> Corridor E2 -> Side Room B (room-small, 12x12).
-	cells.append(Vector2i(0, 2))
-	cells.append(Vector2i(0, 3))
-	cells.append(Vector2i(1, 3))
-	for cx in range(2, 5):
-		for cz in range(2, 5):
-			cells.append(Vector2i(cx, cz))
-	# Corridor S2 (room-wide, 12x20) -> Boss Chamber. The room-wide piece is
-	# rotated 90 degrees at z=28, so its 20-unit span covers world z in
-	# [18, 38], i.e. cz in [5, 9] - one row further out than the corridor's
-	# cz=4, not overlapping it (an off-by-one here previously duplicated cell
-	# (0,4) and left both a phantom floor/navmesh strip beside the corridor at
-	# cz=4 and a missing strip at the chamber's far wall, cz=9).
-	cells.append(Vector2i(0, 4))
-	for cx in range(-1, 2):
-		for cz in range(5, 10):
-			cells.append(Vector2i(cx, cz))
+			var cell: Vector2i = _rotate_cell(local_cell, entry["rot"]) + entry["center"]
+			if not seen.has(cell):
+				seen[cell] = true
+				cells.append(cell)
 	return cells
+
+
+## Instantiates every DUNGEON_LAYOUT piece as a child of `parent`
+## (NavigationRegion3D/DungeonLevel), positioning and rotating each from its
+## `center`/`rot` entry the same way _dungeon_cells() derives the walkable
+## grid from them.
+func _instantiate_dungeon_pieces(parent: Node3D) -> void:
+	for entry in DUNGEON_LAYOUT:
+		var piece: Node3D = (entry["scene"] as PackedScene).instantiate()
+		piece.name = entry["name"]
+		var center: Vector2i = entry["center"]
+		piece.transform = Transform3D(ROTATION_BASES[entry["rot"]], Vector3(center.x, 0.0, center.y) * CELL_SIZE)
+		parent.add_child(piece)
 
 
 ## Returns the world-space walkable area(s) of the starting town, as
