@@ -6,6 +6,21 @@ project uses [Semantic Versioning](https://semver.org/) (`MAJOR.MINOR.PATCH`).
 
 ## [Unreleased]
 
+## [0.18.1] - 2026-06-14
+
+### Fixed
+- Town hub rendered almost entirely white. The 14 Kenney "Fantasy Town
+  Kit" `.glb` assets in `entities/town/kenney/` (walls, fences, gate,
+  fountain, stalls, trees, lantern, road pieces) had been imported into
+  Godot's cache before their shared `Textures/colormap.png` existed, so
+  every generated `StandardMaterial3D` got `albedo_texture = null` and
+  rendered flat white. Forced a reimport (cleared the stale cached
+  `.scn`/`.md5` outputs and reran `--import`) so each material now
+  correctly resolves to `colormap.png`. No source files changed — the
+  fix is a one-time local import-cache regeneration (`.godot/` is
+  gitignored). Dungeon-kit assets and the fountain's translucent water
+  material were already correct and untouched.
+
 ## [0.18.0] - 2026-06-14
 
 M16 "Loot & Progression": replaces the bare `StringName item_id` that has
