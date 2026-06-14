@@ -6,6 +6,18 @@ project uses [Semantic Versioning](https://semver.org/) (`MAJOR.MINOR.PATCH`).
 
 ## [Unreleased]
 
+## [0.18.2] - 2026-06-14
+
+### Changed
+- Town hub layout rework: removed the "Dungeon Gate alcove" protrusion so
+  the town footprint is a clean rectangle, relocated `PortalToDungeon`
+  inside the main plaza (just past the former south wall line), shrank
+  the fountain (2x -> 1x scale, now has walkable clearance) and the
+  barrel/crate props (1x -> 0.5x scale).
+- Removed all visible wall pieces (`wall.glb`/`wall-corner.glb`, 16
+  instances) from the town - the plaza is now fully open, with only the
+  existing invisible boundary colliders keeping players on the floor.
+
 ## [0.18.1] - 2026-06-14
 
 ### Fixed

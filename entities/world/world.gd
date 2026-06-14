@@ -378,7 +378,6 @@ static func _dungeon_cells() -> Array[Vector2i]:
 static func _town_floor_areas() -> Array[Rect2]:
 	return [
 		Rect2(Vector2(-50, -10), Vector2(20, 20)),  # main plaza
-		Rect2(Vector2(-42, 10), Vector2(4, 4)),     # Dungeon Gate alcove
 	]
 
 
@@ -487,14 +486,13 @@ func _build_town_floor_colliders() -> void:
 
 ## Builds invisible wall colliders along every edge of `cells` that doesn't
 ## border another cell in the same set (i.e. the perimeter of the walkable
-## footprint, including door-sized gaps like the dungeon's room-corner notch
-## or the town's Dungeon Gate alcove opening). The imported Kenney meshes
-## carry no collision shapes, so without this, CharacterBody3D.move_and_slide()
-## has nothing to stop it sliding past a wall's visual mesh into the void on
-## the other side - this keeps movement confined to exactly the area the
-## navmesh/floor colliders cover, regardless of any visual mismatch with the
-## hand-placed pieces. Shared by _build_wall_colliders and
-## _build_town_wall_colliders.
+## footprint, including door-sized gaps like the dungeon's room-corner notch).
+## The imported Kenney meshes carry no collision shapes, so without this,
+## CharacterBody3D.move_and_slide() has nothing to stop it sliding into the
+## void beyond the navmesh/floor colliders - this keeps movement confined to
+## exactly the area those colliders cover. For the town (which has no visible
+## wall meshes at all) this is the sole boundary keeping players on the plaza.
+## Shared by _build_wall_colliders and _build_town_wall_colliders.
 func _build_wall_colliders_for_cells(cells: Array[Vector2i], parent_name: String) -> void:
 	var wall_colliders := Node3D.new()
 	wall_colliders.name = parent_name
