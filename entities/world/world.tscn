@@ -146,11 +146,11 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -44, 0, -1.5)
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -36, 0, -1.5)
 
 [node name="StorageChest" parent="Town" instance=ExtResource("30")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -40, 0, 4)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -44, 0, 3)
 
 [node name="PortalToDungeon" parent="Town" instance=ExtResource("31")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -40, 0, 6)
-target_position = Vector3(4, 0, -4)
+target_position = Vector3(-2.5, 0, 0)
 
 [node name="PortalToTown" parent="." instance=ExtResource("31")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -4.5, 0, 0)

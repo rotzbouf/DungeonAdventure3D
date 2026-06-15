@@ -6,6 +6,55 @@ project uses [Semantic Versioning](https://semver.org/) (`MAJOR.MINOR.PATCH`).
 
 ## [Unreleased]
 
+## [0.18.4] - 2026-06-15
+
+### Changed
+- Trimmed the dungeon's `INITIAL_ENEMY_SPAWNS` roster for easier early-stage
+  testing: down from 10 enemies (4 skeleton warriors, 3 goblins, 2 zombies,
+  1 dragon boss) to 4 (2 skeleton warriors, 1 goblin, 1 zombie). The dragon
+  boss is removed entirely for now — a 500 HP fight isn't useful while
+  iterating on early gameplay, and floor completion (exit portal) is simply
+  unreachable until it's added back. `_spawn_initial_enemies` now iterates
+  `INITIAL_ENEMY_SPAWNS.size()` instead of the full 10-marker
+  `EnemySpawnPoints`, so the unused spawn points are simply skipped (no
+  scene changes needed — easy to grow the roster again later).
+
+### Fixed
+- Town `StorageChest` was placed at `(-40, 0, 4)`, almost directly on top of
+  `PortalToDungeon` at `(-40, 0, 6)` — the chest's `StaticBody3D` collider
+  (z 3.75-4.45) left almost no clearance before the portal's trigger zone
+  (starting at z 4.5), and visually the chest sat right on top of the
+  portal's glow. Moved the chest to `(-44, 0, 3)`, off the fountain-portal
+  axis and clear of the barrel/blacksmith area. Verified via windowed
+  listen-host: chest no longer overlaps the portal, and walking into the
+  portal teleports cleanly into the dungeon EntryRoom.
+- `PortalToDungeon` dropped arriving players at `(4, 0, -4)` in the
+  EntryRoom — the corner opposite the glowing `PortalToTown` return
+  portal, so a fresh arrival looked like it had spawned in the wrong
+  room with no visible way back. Changed `target_position` to
+  `(-2.5, 0, 0)`, right beside the return portal's glow (just outside
+  its 1.5-radius trigger so there's no instant bounce-back). Verified
+  via windowed listen-host.
+- `chest_model.glb` (used for both the town and dungeon storage chests)
+  had no image/material wired into its export at all, so it rendered as
+  a flat white/gray box. Re-exported from `MyAssets/chest3-final.blend`
+  with `Chest3.png` wired to the material's Base Color via a new UV-mapped
+  Image Texture node; `Open`/`Close` animations preserved. Verified
+  visually — chest now shows its wood-grain/metal-trim texture.
+- Town merchant NPCs `dwarf.glb` and `wizard.glb` rendered as flat-colored
+  models — `convert_town_npcs.py` had recolored their materials with flat
+  colors because their original diffuse textures appeared to be
+  broken/missing. Re-inspecting the source `.blend` files found the
+  textures were actually recoverable: the dwarf's diffuse maps
+  (`a_diff`/`b_diff`/`c_diff`/`leather_diffuse`) are packed inside
+  `fixed.blend`, and the wizard's atlas (`lightned2.bmp`) exists on disk
+  in the extracted asset folder (its `.blend` only had a broken
+  `H:/Gandalph/Done/...` path to it). Re-exported both GLBs with these
+  diffuse textures wired to their materials via the existing UV layers
+  instead of flat recolors. Verified visually in the windowed
+  listen-host — both NPCs now show real texture detail (the dwarf's
+  fur/leather patterning, the wizard's white beard and hat).
+
 ## [0.18.3] - 2026-06-14
 
 ### Changed

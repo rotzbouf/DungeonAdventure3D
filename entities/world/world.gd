@@ -45,15 +45,14 @@ const SPAWN_HEIGHT := 0.0  # body origin sits at the character's feet — the ca
 # so each scaled piece spans exactly one cell.
 const CELL_SIZE := 4.0
 
-## One entry per EnemySpawnPoints marker (matched by index): the starting
-## roster for this floor — 4 skeleton warriors guarding the entry/hub, 3
-## goblins in Side Room A, 2 zombies in the Hub, and the dragon boss in the
-## Boss Chamber.
+## Trimmed-down early-stage roster (a subset of EnemySpawnPoints, matched by
+## index): 2 skeleton warriors guarding the entry/hub, 1 goblin in Side Room
+## A, 1 zombie in the Hub. No dragon boss for now — easier to test the early
+## gameplay loop without a 500 HP fight blocking floor completion.
 const INITIAL_ENEMY_SPAWNS: Array[StringName] = [
-	&"skeleton_warrior", &"skeleton_warrior", &"skeleton_warrior", &"skeleton_warrior",
-	&"goblin", &"goblin", &"goblin",
-	&"zombie", &"zombie",
-	&"dragon",
+	&"skeleton_warrior", &"skeleton_warrior",
+	&"goblin",
+	&"zombie",
 ]
 
 @onready var _navigation_region: NavigationRegion3D = $NavigationRegion3D
@@ -204,8 +203,7 @@ func get_spawn_position(index: int) -> Vector3:
 ## a sequential index — the same "primitives only, re-resolve from
 ## GameDatabase" shape as _spawn_player.
 func _spawn_initial_enemies() -> void:
-	var spawn_points := _enemy_spawn_points.get_children()
-	for i in spawn_points.size():
+	for i in INITIAL_ENEMY_SPAWNS.size():
 		_enemy_spawner.spawn({"definition_id": INITIAL_ENEMY_SPAWNS[i], "spawn_index": i})
 
 
