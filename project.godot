@@ -11,7 +11,7 @@ config_version=5
 [application]
 
 config/name="Dungeon Adventure 3D"
-config/version="0.18.4"
+config/version="0.18.5"
 run/main_scene="res://main.tscn"
 config/features=PackedStringArray("4.6", "Forward Plus")
 

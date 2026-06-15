@@ -6,6 +6,31 @@ project uses [Semantic Versioning](https://semver.org/) (`MAJOR.MINOR.PATCH`).
 
 ## [Unreleased]
 
+## [0.18.5] - 2026-06-15
+
+### Changed
+- Town merchant NPCs (`MerchantBlacksmith`/dwarf, `MerchantGeneralStore`/
+  wizard) stood at `z=-1.5` relative to their stalls — on the spawn/camera
+  side, where the canopy's pitched roof partly hid them (only their heads
+  poked out above it). Moved both to `z=+1.5`, the far side of the stall
+  from spawn, so they now stand fully visible in front of their counters.
+- Rotated `StallRed` and `StallGreen` 90 degrees (their square 2x2
+  footprint and matching `BoxShape3D` collider are unaffected by the
+  rotation). This turns the stall's awning/counter to face the new NPC
+  position, so the merchant now stands in front of an open counter instead
+  of behind the canopy's ridge. Verified visually via windowed listen-host.
+
+### Fixed
+- Dungeon `Props/Barrel1` and `Props/Crate1` were at full (1x) scale,
+  noticeably oversized next to the player, and badly placed: `Barrel1` at
+  `(-5, 0, 5)` sat on the EntryRoom's curved wall geometry rather than the
+  floor, and `Crate1` at `(-5, 0, 1)` overlapped `PortalToTown`'s glow and
+  trigger radius (~1.12 units from its center, inside the 1.5-radius
+  trigger). Scaled both to 0.5x (matching the already-fixed town
+  barrel/crate) and moved them to `(1, 0, -1)` and `(-1, 0, 1)`
+  respectively — both clear of the walls and the portal, inside the
+  EntryRoom's open floor area. Verified visually via windowed listen-host.
+
 ## [0.18.4] - 2026-06-15
 
 ### Changed
