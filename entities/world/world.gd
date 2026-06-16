@@ -21,6 +21,8 @@ signal character_creation_failed(reason: String)
 signal floor_cleared(xp_reward: int, new_floor: int)
 
 const _DungeonDebugOverlay := preload("res://entities/world/dungeon_debug_overlay.gd")
+const _DungeonState := preload("res://entities/world/dungeon_state.gd")
+const _DungeonGenerator := preload("res://entities/world/dungeon_generator.gd")
 
 const PLAYER_SCENE := "res://entities/player/player.tscn"
 const ENEMY_SCENE := "res://entities/enemy/enemy.tscn"
@@ -194,7 +196,7 @@ func get_spawn_position(index: int) -> Vector3:
 ## dungeon deterministically from (floor_number, dungeon_seed) so all peers
 ## converge on the same layout without any extra RPCs.
 func _spawn_dungeon_state(data: Dictionary) -> Node:
-	var state := DungeonState.new()
+	var state := _DungeonState.new()
 	state.floor_number = int(data.floor_number)
 	state.dungeon_seed = int(data.dungeon_seed)
 	state.name = "DungeonState_%d" % state.floor_number
@@ -206,7 +208,7 @@ func _spawn_dungeon_state(data: Dictionary) -> Node:
 ## the given seed. Runs on every peer (called from _spawn_dungeon_state).
 ## Server also respawns enemies; clients only rebuild geometry.
 func _rebuild_dungeon(floor_num: int, dungeon_seed: int) -> void:
-	var generated := DungeonGenerator.generate(floor_num, dungeon_seed)
+	var generated := _DungeonGenerator.generate(floor_num, dungeon_seed)
 	_dungeon_layout = generated.layout
 
 	var dungeon_level: Node3D = _navigation_region.get_node("DungeonLevel")
@@ -579,8 +581,14 @@ func _build_dungeon_navigation_mesh() -> NavigationMesh:
 ## separate NavigationRegion3D from the dungeon's, since the two areas are
 ## disconnected walkable islands -- only reachable from each other via
 ## area_portal.gd's teleports, not a walkable corridor.
+static func _town_nav_cells() -> Array[Vector2i]:
+	var cells := _town_cells()
+	cells.erase(Vector2i(-10, 0))   # fountain occupies this cell
+	return cells
+
+
 func _build_town_navigation_mesh() -> NavigationMesh:
-	return _build_navigation_mesh_for_cells(_town_cells())
+	return _build_navigation_mesh_for_cells(_town_nav_cells())
 
 
 ## Builds invisible floor colliders matching `cells` (one thin StaticBody3D

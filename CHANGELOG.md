@@ -6,6 +6,17 @@ project uses [Semantic Versioning](https://semver.org/) (`MAJOR.MINOR.PATCH`).
 
 ## [Unreleased]
 
+## [0.19.1] - 2026-06-16
+
+### Fixed
+- Town fountain no longer blocks the path to PortalToDungeon: fountain cell
+  (-10,0) excluded from town navmesh so the agent routes around it.
+- Clicking on above-floor props (fountain top, stall roofs) now projects the
+  destination onto the y=0 floor plane before sending to server, preventing
+  y>0 navmesh snap failures.
+- Dungeon entry spawn moved to EntryRoom center (0,0,0); was at (-2.5,0,0)
+  which left the player at the west edge with large void area visible.
+
 ## [0.19.0] - 2026-06-16
 
 ### Added

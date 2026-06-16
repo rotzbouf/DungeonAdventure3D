@@ -54,7 +54,7 @@ func _handle_click(screen_position: Vector2) -> void:
 	# Wall clicks project onto the y=0 floor plane so the server-side navmesh
 	# snap in move_to() gets a reasonable destination instead of a y>0 wall face.
 	var destination: Vector3
-	if _is_wall_collider(result.collider):
+	if _is_wall_collider(result.collider) or result.position.y > 0.1:
 		destination = _ray_y0_intersection(from, direction)
 	else:
 		destination = result.position
