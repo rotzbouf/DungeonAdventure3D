@@ -6,6 +6,56 @@ project uses [Semantic Versioning](https://semver.org/) (`MAJOR.MINOR.PATCH`).
 
 ## [Unreleased]
 
+## [0.19.0] - 2026-06-16
+
+### Added
+- **Procedural dungeon floors (M17)**: `DungeonGenerator` (pure static class)
+  produces a new seeded layout each floor — Phase 1 fixes the EntryRoom at
+  origin, Phase 2 grows 2–5 side rooms via frontier expansion, Phase 3 places
+  a boss chamber south of the deepest side room. Number of side rooms and enemy
+  count both scale with floor number.
+- `DungeonState` / `DungeonStateSpawner`: thin replicated node carrying
+  `(floor_number, dungeon_seed)`; every peer deterministically rebuilds the
+  same geometry from these two values, making late joiners safe with no extra
+  RPCs.
+- `world._rebuild_dungeon()`: tears down old pieces/colliders/navmesh and
+  rebuilds for the new floor; repositions the exit portal and boss chamber
+  area to the generated boss room center.
+- `world._advance_floor()`: server-only; increments floor counter, spawns a
+  new `DungeonState` with a fresh seed, teleports all players to the entry
+  room origin.
+- `exit_portal.deactivate()`: resets trigger state and disconnects the
+  `body_entered` signal between floors, preventing double-trigger on
+  re-activation.
+- `dungeon_debug_overlay.gd`: env-gated visual overlay (`DEBUG_CELLS=1`) —
+  colored flat quads per cell (green=entry, blue=side, red=boss, grey=corridor)
+  with `(cx,cz)` coordinate labels and colored wall-bar strips at each boundary
+  edge (blue=N, yellow=S, red=E, green=W).
+- `DEBUG_LAYOUT=1` environment flag: prints the full layout table (piece name,
+  type, center, rotation, world position, total cell count) on every floor
+  build, plus an assertion that the EntryRoom's 8 expected cells and excluded
+  notch are correct.
+- `DEBUG_CLICK=1` environment flag: traces raycast hit position/collider in
+  `player_input` and raw-vs-snapped destination + delta in `player_controller`.
+
+### Fixed
+- Clicking near or on a wall collider sent a y > 0 wall-face position as the
+  move destination, causing the character to navigate to an off-navmesh point.
+  `player_input._handle_click()` now detects wall collider hits (by parent node
+  name) and projects the camera ray onto the y=0 ground plane instead.
+- `player_controller.move_to()` now explicitly snaps the destination to the
+  nearest navmesh point via `NavigationServer3D.map_get_closest_point()` before
+  setting `_agent.target_position`, making off-navmesh clicks robust even after
+  the wall-hit fix.
+- Characters could wedge against a navmesh corner: velocity was set each frame
+  but `move_and_slide()` returned zero displacement. `_walk_path()` now tracks
+  a `_stuck_timer`; if the character has significant velocity but moves less
+  than 0.01 m for 0.4 s, navigation is cancelled (target reset to current
+  position) to un-wedge it.
+- Boss health bar failed to rewire after advancing to floor 2+ because
+  `_dragon_connected` was never reset. `hud._on_floor_cleared()` now resets it
+  so `_connect_to_dragon()` re-runs next frame when the new dragon spawns.
+
 ## [0.18.5] - 2026-06-15
 
 ### Changed
