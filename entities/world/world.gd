@@ -18,7 +18,9 @@ signal character_creation_failed(reason: String)
 ## Server -> the player who entered the activated ExitPortal. Bridges
 ## exit_portal.gd's on_floor_cleared RPC to a local signal the HUD connects
 ## to, mirroring the character_creation_* bridge pattern above.
-signal floor_cleared(xp_reward: int)
+signal floor_cleared(xp_reward: int, new_floor: int)
+
+const _DungeonDebugOverlay := preload("res://entities/world/dungeon_debug_overlay.gd")
 
 const PLAYER_SCENE := "res://entities/player/player.tscn"
 const ENEMY_SCENE := "res://entities/enemy/enemy.tscn"
@@ -45,16 +47,6 @@ const SPAWN_HEIGHT := 0.0  # body origin sits at the character's feet — the ca
 # so each scaled piece spans exactly one cell.
 const CELL_SIZE := 4.0
 
-## Trimmed-down early-stage roster (a subset of EnemySpawnPoints, matched by
-## index): 2 skeleton warriors guarding the entry/hub, 1 goblin in Side Room
-## A, 1 zombie in the Hub. No dragon boss for now — easier to test the early
-## gameplay loop without a 500 HP fight blocking floor completion.
-const INITIAL_ENEMY_SPAWNS: Array[StringName] = [
-	&"skeleton_warrior", &"skeleton_warrior",
-	&"goblin",
-	&"zombie",
-]
-
 @onready var _navigation_region: NavigationRegion3D = $NavigationRegion3D
 @onready var _town_navigation_region: NavigationRegion3D = $TownNavigationRegion3D
 @onready var _players_root: Node3D = $Players
@@ -62,11 +54,16 @@ const INITIAL_ENEMY_SPAWNS: Array[StringName] = [
 @onready var _spawn_points: Node3D = $SpawnPoints
 @onready var _enemies_root: Node3D = $Enemies
 @onready var _enemy_spawner: MultiplayerSpawner = $EnemySpawner
-@onready var _enemy_spawn_points: Node3D = $EnemySpawnPoints
 @onready var _loot_spawner: MultiplayerSpawner = $LootSpawner
+@onready var _loot_drops: Node3D = $LootDrops
 @onready var _exit_portal: Area3D = $ExitPortal
+@onready var _dungeon_state_spawner: MultiplayerSpawner = $DungeonStateSpawner
+@onready var _dungeon_state_root: Node = $DungeonStateRoot
 
 var _loot_counter: int = 0
+var _current_floor: int = 1
+var _dungeon_layout: Array = []
+var _dungeon_rng := RandomNumberGenerator.new()
 
 ## Server-only RNG for area/cone damage rolls (CombatSystem.compute_hit) —
 ## mirrors enemy_controller.gd's _rng. Never used client-side; clients only
@@ -79,24 +76,18 @@ func _enter_tree() -> void:
 
 
 func _ready() -> void:
-	_instantiate_dungeon_pieces(_navigation_region.get_node("DungeonLevel"))
-	_navigation_region.navigation_mesh = _build_dungeon_navigation_mesh()
 	_town_navigation_region.navigation_mesh = _build_town_navigation_mesh()
-	_build_floor_colliders()
-	_build_wall_colliders()
 	_build_town_floor_colliders()
 	_build_town_wall_colliders()
 	_spawner.spawn_function = _spawn_player
 	_enemy_spawner.spawn_function = _spawn_enemy
 	_loot_spawner.spawn_function = _spawn_loot
+	_dungeon_state_spawner.spawn_function = _spawn_dungeon_state
 
 	if NetworkMode.is_server():
 		NetworkManager.peer_disconnected.connect(_on_peer_disconnected)
-		# Late joiners: MultiplayerSpawner replicates already-tracked spawns
-		# (including the `data` dict each was spawned with) to newly connected
-		# peers automatically — no roster code needed. Spawning itself is now
-		# client-initiated via request_create_character, not connect-triggered.
-		_spawn_initial_enemies()
+		_dungeon_rng.randomize()
+		_dungeon_state_spawner.spawn({"floor_number": 1, "dungeon_seed": _dungeon_rng.randi()})
 	if NetworkMode.is_client():
 		AudioManager.play_ambient(&"dungeon_ambience")
 		AudioManager.play_music(&"dungeon_explore")
@@ -198,13 +189,104 @@ func get_spawn_position(index: int) -> Vector3:
 	return Vector3(slot.position.x, SPAWN_HEIGHT, slot.position.z)
 
 
-## Server-only: place one enemy at each EnemySpawnPoints marker, per
-## INITIAL_ENEMY_SPAWNS. Each spawn's `data` only carries the definition id +
-## a sequential index — the same "primitives only, re-resolve from
-## GameDatabase" shape as _spawn_player.
-func _spawn_initial_enemies() -> void:
-	for i in INITIAL_ENEMY_SPAWNS.size():
-		_enemy_spawner.spawn({"definition_id": INITIAL_ENEMY_SPAWNS[i], "spawn_index": i})
+## Runs on every peer when the DungeonStateSpawner spawns or replicates a
+## DungeonState node (including late-joiner replay). Rebuilds the entire
+## dungeon deterministically from (floor_number, dungeon_seed) so all peers
+## converge on the same layout without any extra RPCs.
+func _spawn_dungeon_state(data: Dictionary) -> Node:
+	var state := DungeonState.new()
+	state.floor_number = int(data.floor_number)
+	state.dungeon_seed = int(data.dungeon_seed)
+	state.name = "DungeonState_%d" % state.floor_number
+	_rebuild_dungeon(state.floor_number, state.dungeon_seed)
+	return state
+
+
+## Tears down the current dungeon and builds a fresh one for `floor_num` using
+## the given seed. Runs on every peer (called from _spawn_dungeon_state).
+## Server also respawns enemies; clients only rebuild geometry.
+func _rebuild_dungeon(floor_num: int, dungeon_seed: int) -> void:
+	var generated := DungeonGenerator.generate(floor_num, dungeon_seed)
+	_dungeon_layout = generated.layout
+
+	var dungeon_level: Node3D = _navigation_region.get_node("DungeonLevel")
+	for child in dungeon_level.get_children():
+		child.free()  # immediate — not spawner-tracked
+
+	for cname: String in ["FloorColliders", "WallColliders"]:
+		var existing := get_node_or_null(cname)
+		if existing != null:
+			existing.free()
+
+	_instantiate_dungeon_pieces(dungeon_level)
+	_navigation_region.navigation_mesh = _build_dungeon_navigation_mesh()
+	_build_floor_colliders()
+	_build_wall_colliders()
+
+	var boss_center := Vector3.ZERO
+	for entry: Dictionary in _dungeon_layout:
+		if entry.get("role", &"") == &"boss":
+			boss_center = Vector3(entry.center.x * CELL_SIZE, 0.0, entry.center.y * CELL_SIZE)
+			break
+	_exit_portal.global_position = boss_center
+	_exit_portal.deactivate()
+
+	var boss_area := get_node_or_null("BossChamberArea") as Area3D
+	if boss_area != null:
+		boss_area.global_position = Vector3(boss_center.x, 1.0, boss_center.z)
+
+	if NetworkMode.is_server():
+		for child in _enemies_root.get_children():
+			child.queue_free()
+		for child in _loot_drops.get_children():
+			child.queue_free()
+		_loot_counter = 0
+		for i: int in generated.enemy_spawns.size():
+			var sp: Dictionary = generated.enemy_spawns[i]
+			_enemy_spawner.spawn({
+				"definition_id": sp.definition_id,
+				"spawn_index": i,
+				"pos_x": sp.pos_x,
+				"pos_z": sp.pos_z,
+			})
+
+	if OS.has_environment("DEBUG_LAYOUT"):
+		_debug_dump_layout()
+
+	if OS.has_environment("DEBUG_CELLS"):
+		var old_overlay := get_node_or_null("DungeonDebugOverlay")
+		if old_overlay != null:
+			old_overlay.free()
+		var cell_roles: Dictionary = {}
+		for entry: Dictionary in _dungeon_layout:
+			var role: StringName = entry.get("role", &"")
+			var footprint: Dictionary = PIECE_FOOTPRINTS[entry["piece"]]
+			var notches: Array = footprint.get("notches", [])
+			for lc: Vector2i in footprint["cells"]:
+				if lc in notches:
+					continue
+				var wc: Vector2i = _rotate_cell(lc, entry["rot"]) + entry["center"]
+				cell_roles[wc] = role
+		var overlay = _DungeonDebugOverlay.new()
+		overlay.name = "DungeonDebugOverlay"
+		add_child(overlay)
+		overlay.build(cell_roles)
+
+
+## Server-only: advance to the next floor. Frees the current DungeonState
+## (which clears the old dungeon via the spawner's delete replication), spawns
+## a new one with a fresh seed, and teleports all players to the entry room.
+func _advance_floor() -> void:
+	if not NetworkMode.is_server():
+		return
+	_current_floor += 1
+	for child in _dungeon_state_root.get_children():
+		child.queue_free()
+	_dungeon_state_spawner.spawn({"floor_number": _current_floor, "dungeon_seed": _dungeon_rng.randi()})
+	for child in _players_root.get_children():
+		var player := child as CharacterBody3D
+		if player != null:
+			player.position = Vector3(0.0, SPAWN_HEIGHT, 0.0)
 
 
 ## Deterministic reconstruction from replicated data — see _spawn_player.
@@ -212,11 +294,9 @@ func _spawn_enemy(data: Dictionary) -> Node:
 	var definition_id: StringName = data.definition_id
 	var scene_path := DRAGON_SCENE if definition_id == &"dragon" else ENEMY_SCENE
 	var enemy: CharacterBody3D = load(scene_path).instantiate()
-	var spawn_index: int = int(data.spawn_index)
 	enemy.definition_id = definition_id
-	enemy.name = "Enemy_%d" % spawn_index
-	var slot: Node3D = _enemy_spawn_points.get_children()[spawn_index]
-	enemy.position = Vector3(slot.position.x, SPAWN_HEIGHT, slot.position.z)
+	enemy.name = "Enemy_%d" % int(data.spawn_index)
+	enemy.position = Vector3(float(data.pos_x), SPAWN_HEIGHT, float(data.pos_z))
 	return enemy
 
 
@@ -322,23 +402,23 @@ func activate_exit_portal() -> void:
 ## (exit_portal.gd._on_body_entered). Bridges to the floor_cleared signal the
 ## HUD's floor-cleared overlay connects to.
 @rpc("authority", "call_local", "reliable")
-func on_floor_cleared(xp_reward: int) -> void:
-	floor_cleared.emit(xp_reward)
+func on_floor_cleared(xp_reward: int, new_floor: int) -> void:
+	floor_cleared.emit(xp_reward, new_floor)
 
 
-# --- Dungeon layout (declarative) ------------------------------------------
+# --- Dungeon geometry helpers ------------------------------------------------
 #
-# DUNGEON_LAYOUT is the single source of truth for the dungeon's room/corridor
-# pieces: _dungeon_cells() (the walkable-footprint grid used by the nav mesh
-# and floor/wall colliders below) and _instantiate_dungeon_pieces() (the
-# actual GLB placements, replacing static nodes that used to live in
-# world.tscn) both derive from it, so a piece's position/rotation can never
-# drift out of sync between "what's walkable" and "what's rendered".
+# _dungeon_layout (populated by DungeonGenerator each floor) is the runtime
+# source of truth for the dungeon's room/corridor pieces. _cells_from_layout()
+# (walkable-footprint grid → nav mesh and floor/wall colliders) and
+# _instantiate_dungeon_pieces() (actual GLB placements) both derive from it,
+# so a piece's position/rotation can never drift between "what's walkable" and
+# "what's rendered".
 #
 # ROTATION_BASES[r] is the Transform3D.basis for a rotation of r * 90 degrees
 # about Y. The same (x, z) mapping rotates integer cell offsets via
 # _rotate_cell(), since cell centers are just (cx, cz) * CELL_SIZE and the
-# mapping is linear - so a piece's mesh and its footprint cells always rotate
+# mapping is linear — so a piece's mesh and its footprint cells always rotate
 # together.
 const ROTATION_BASES: Array[Basis] = [
 	Basis(Vector3(1, 0, 0), Vector3(0, 1, 0), Vector3(0, 0, 1)),    # r=0: (x,z) -> (x,z)
@@ -347,19 +427,13 @@ const ROTATION_BASES: Array[Basis] = [
 	Basis(Vector3(0, 0, -1), Vector3(0, 1, 0), Vector3(1, 0, 0)),   # r=3: (x,z) -> (z,-x)
 ]
 
-const ROOM_CORNER_SCENE := preload("res://entities/dungeon/kenney/room-corner.glb")
-const CORRIDOR_SCENE := preload("res://entities/dungeon/kenney/corridor.glb")
-const ROOM_SMALL_SCENE := preload("res://entities/dungeon/kenney/room-small.glb")
-const INTERSECTION_SCENE := preload("res://entities/dungeon/kenney/corridor-intersection.glb")
-const ROOM_WIDE_SCENE := preload("res://entities/dungeon/kenney/room-wide.glb")
-
 # Local cell footprints (centered on each piece's own origin, before
 # rotation/translation), derived from each GLB's mesh AABB. room_corner is
 # the only piece with a "notch" - the namesake cut-away corner with no floor
 # geometry, listed separately so rotation carries it along with the piece.
 const PIECE_FOOTPRINTS := {
 	"corridor": {"cells": [Vector2i(0, 0)]},
-	"intersection": {"cells": [Vector2i(0, 0)]},
+	"intersection": {"cells": [Vector2i(0, 0)]},  # kept for any static layouts
 	"room_small": {"cells": [
 		Vector2i(-1, -1), Vector2i(0, -1), Vector2i(1, -1),
 		Vector2i(-1, 0), Vector2i(0, 0), Vector2i(1, 0),
@@ -380,28 +454,6 @@ const PIECE_FOOTPRINTS := {
 	},
 }
 
-# The dungeon's room/corridor pieces. `center` is the cell at the center of
-# the piece's bounding box (Transform3D.origin = center * CELL_SIZE); `rot`
-# is a ROTATION_BASES index (0-3).
-#
-# EntryRoom: rot=2 (180 degrees) rotates room_corner's notch from local
-# (-1,-1) to local (1,1), which - since center is (0,0) - moves the open
-# corner from world (-X,-Z) (facing empty space) to world (+X,+Z), between
-# the CorridorE1 (east) and CorridorS1 (south) connections. This is the
-# Entry Room misalignment fix.
-const DUNGEON_LAYOUT := [
-	{"name": "EntryRoom", "scene": ROOM_CORNER_SCENE, "piece": "room_corner", "center": Vector2i(0, 0), "rot": 2},
-	{"name": "CorridorE1", "scene": CORRIDOR_SCENE, "piece": "corridor", "center": Vector2i(2, 0), "rot": 0},
-	{"name": "SideRoomA", "scene": ROOM_SMALL_SCENE, "piece": "room_small", "center": Vector2i(4, 0), "rot": 1},
-	{"name": "CorridorS1", "scene": CORRIDOR_SCENE, "piece": "corridor", "center": Vector2i(0, 2), "rot": 3},
-	{"name": "Hub", "scene": INTERSECTION_SCENE, "piece": "intersection", "center": Vector2i(0, 3), "rot": 0},
-	{"name": "CorridorE2", "scene": CORRIDOR_SCENE, "piece": "corridor", "center": Vector2i(1, 3), "rot": 0},
-	{"name": "SideRoomB", "scene": ROOM_SMALL_SCENE, "piece": "room_small", "center": Vector2i(3, 3), "rot": 1},
-	{"name": "CorridorS2", "scene": CORRIDOR_SCENE, "piece": "corridor", "center": Vector2i(0, 4), "rot": 3},
-	{"name": "BossChamber", "scene": ROOM_WIDE_SCENE, "piece": "room_wide", "center": Vector2i(0, 7), "rot": 3},
-]
-
-
 ## Rotates a cell offset by `rot` * 90 degrees, matching ROTATION_BASES[rot]'s
 ## (x, z) mapping - so a piece's footprint cells rotate the same way as its
 ## mesh.
@@ -414,17 +466,16 @@ static func _rotate_cell(cell: Vector2i, rot: int) -> Vector2i:
 
 
 ## Returns the (cell_x, cell_z) grid coordinates of every walkable cell in the
-## dungeon, where cell (cx, cz) covers world space x in [cx*CELL_SIZE -
-## CELL_SIZE/2, cx*CELL_SIZE + CELL_SIZE/2] and likewise for z. Derived from
-## DUNGEON_LAYOUT (see above): each piece's local footprint, minus any
-## notches, is rotated and translated to its placement.
-static func _dungeon_cells() -> Array[Vector2i]:
+## dungeon. Derived from `layout` (the same shape as the old DUNGEON_LAYOUT
+## constant, now generated by DungeonGenerator): each piece's local footprint,
+## minus notches, is rotated and translated to its world-space position.
+static func _cells_from_layout(layout: Array) -> Array[Vector2i]:
 	var seen := {}
 	var cells: Array[Vector2i] = []
-	for entry in DUNGEON_LAYOUT:
+	for entry: Dictionary in layout:
 		var footprint: Dictionary = PIECE_FOOTPRINTS[entry["piece"]]
 		var notches: Array = footprint.get("notches", [])
-		for local_cell in footprint["cells"]:
+		for local_cell: Vector2i in footprint["cells"]:
 			if local_cell in notches:
 				continue
 			var cell: Vector2i = _rotate_cell(local_cell, entry["rot"]) + entry["center"]
@@ -434,12 +485,10 @@ static func _dungeon_cells() -> Array[Vector2i]:
 	return cells
 
 
-## Instantiates every DUNGEON_LAYOUT piece as a child of `parent`
-## (NavigationRegion3D/DungeonLevel), positioning and rotating each from its
-## `center`/`rot` entry the same way _dungeon_cells() derives the walkable
-## grid from them.
+## Instantiates every piece in `_dungeon_layout` as a child of `parent`
+## (NavigationRegion3D/DungeonLevel), using the same center/rot convention.
 func _instantiate_dungeon_pieces(parent: Node3D) -> void:
-	for entry in DUNGEON_LAYOUT:
+	for entry: Dictionary in _dungeon_layout:
 		var piece: Node3D = (entry["scene"] as PackedScene).instantiate()
 		piece.name = entry["name"]
 		var center: Vector2i = entry["center"]
@@ -523,7 +572,7 @@ func _build_navigation_mesh_for_cells(cells: Array[Vector2i]) -> NavigationMesh:
 
 
 func _build_dungeon_navigation_mesh() -> NavigationMesh:
-	return _build_navigation_mesh_for_cells(_dungeon_cells())
+	return _build_navigation_mesh_for_cells(_cells_from_layout(_dungeon_layout))
 
 
 ## Builds the starting town's navmesh from _town_cells(). Assigned to a
@@ -557,7 +606,7 @@ func _build_floor_colliders_for_cells(cells: Array[Vector2i], parent_name: Strin
 
 
 func _build_floor_colliders() -> void:
-	_build_floor_colliders_for_cells(_dungeon_cells(), "FloorColliders")
+	_build_floor_colliders_for_cells(_cells_from_layout(_dungeon_layout), "FloorColliders")
 
 
 func _build_town_floor_colliders() -> void:
@@ -596,7 +645,7 @@ func _build_wall_colliders_for_cells(cells: Array[Vector2i], parent_name: String
 
 
 func _build_wall_colliders() -> void:
-	_build_wall_colliders_for_cells(_dungeon_cells(), "WallColliders")
+	_build_wall_colliders_for_cells(_cells_from_layout(_dungeon_layout), "WallColliders")
 
 
 func _build_town_wall_colliders() -> void:
@@ -612,3 +661,38 @@ func _add_wall_collider(parent: Node3D, edge_center: Vector3, size: Vector3) -> 
 	body.add_child(shape)
 	body.position = edge_center + Vector3(0.0, size.y / 2.0, 0.0)
 	parent.add_child(body)
+
+
+func _debug_dump_layout() -> void:
+	for entry: Dictionary in _dungeon_layout:
+		var cx: int = entry.center.x
+		var cz: int = entry.center.y
+		print("[LAYOUT] %-15s piece=%-12s center=(%d,%d) rot=%d world=(%g,0,%g)" % [
+			entry.name, entry.piece, cx, cz, entry.rot,
+			float(cx) * CELL_SIZE, float(cz) * CELL_SIZE,
+		])
+	var cells := _cells_from_layout(_dungeon_layout)
+	print("[LAYOUT] cell count = %d" % cells.size())
+	_debug_assert_entry_room_cells(cells)
+
+
+static func _debug_assert_entry_room_cells(cells: Array[Vector2i]) -> void:
+	var cell_set := {}
+	for c in cells:
+		cell_set[c] = true
+	var expected: Array[Vector2i] = [
+		Vector2i( 1, -1), Vector2i( 0, -1), Vector2i(-1, -1),
+		Vector2i( 1,  0), Vector2i( 0,  0), Vector2i(-1,  0),
+		Vector2i( 0,  1), Vector2i(-1,  1),
+	]
+	var excluded := Vector2i(1, 1)
+	var ok := true
+	for c: Vector2i in expected:
+		if not cell_set.has(c):
+			print("[CELL TEST] FAIL — expected cell %s missing" % str(c))
+			ok = false
+	if cell_set.has(excluded):
+		print("[CELL TEST] FAIL — notch cell %s should be excluded" % str(excluded))
+		ok = false
+	if ok:
+		print("[CELL TEST] PASS")

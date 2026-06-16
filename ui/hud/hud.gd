@@ -44,7 +44,7 @@ func _process(_delta: float) -> void:
 	if world == null:
 		return
 	if not _world_connected:
-		world.floor_cleared.connect(_floor_cleared_overlay.show_overlay)
+		world.floor_cleared.connect(_on_floor_cleared)
 		_world_connected = true
 	if not _dragon_connected:
 		_connect_to_dragon(world)
@@ -71,10 +71,16 @@ func _connect_to_dragon(world: Node) -> void:
 		_boss_health_bar.update_hp(health.hp, health.max_hp)
 		health.hp_changed.connect(_boss_health_bar.update_hp)
 		var boss_area: Area3D = world.get_node("BossChamberArea")
-		boss_area.body_entered.connect(_on_boss_chamber_entered)
-		boss_area.body_exited.connect(_on_boss_chamber_exited)
+		if not boss_area.body_entered.is_connected(_on_boss_chamber_entered):
+			boss_area.body_entered.connect(_on_boss_chamber_entered)
+			boss_area.body_exited.connect(_on_boss_chamber_exited)
 		_dragon_connected = true
 		return
+
+
+func _on_floor_cleared(xp_reward: int, new_floor: int) -> void:
+	_floor_cleared_overlay.show_overlay(xp_reward, new_floor)
+	_dragon_connected = false
 
 
 func _on_boss_chamber_entered(body: Node3D) -> void:

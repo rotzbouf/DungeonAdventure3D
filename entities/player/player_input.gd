@@ -39,6 +39,8 @@ func _handle_click(screen_position: Vector2) -> void:
 	var result := space_state.intersect_ray(query)
 	if result.is_empty():
 		return
+	if OS.has_environment("DEBUG_CLICK"):
+		print("[CLICK] screen=%s world=%s collider=%s" % [str(screen_position), str(result.position), result.collider.name])
 	var interactable := _find_interactable(result.collider)
 	if interactable != null:
 		interactable.interact(get_parent())
@@ -49,7 +51,26 @@ func _handle_click(screen_position: Vector2) -> void:
 		# reference — same convention as Player_<peer_id> everywhere else.
 		request_attack_target.rpc_id(1, enemy.name)
 		return
-	request_move_to.rpc_id(1, result.position)
+	# Wall clicks project onto the y=0 floor plane so the server-side navmesh
+	# snap in move_to() gets a reasonable destination instead of a y>0 wall face.
+	var destination: Vector3
+	if _is_wall_collider(result.collider):
+		destination = _ray_y0_intersection(from, direction)
+	else:
+		destination = result.position
+	request_move_to.rpc_id(1, destination)
+
+
+func _is_wall_collider(collider: Node) -> bool:
+	var p := collider.get_parent()
+	return p != null and (p.name == "WallColliders" or p.name == "TownWallColliders")
+
+
+## Intersects the camera ray with the y=0 ground plane.
+func _ray_y0_intersection(from: Vector3, direction: Vector3) -> Vector3:
+	if abs(direction.y) < 0.001:
+		return from  # near-horizontal ray — use ray origin as fallback
+	return from + direction * (-from.y / direction.y)
 
 
 ## Returns the clicked enemy body (the CharacterBody3D living under the

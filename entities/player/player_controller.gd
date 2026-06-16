@@ -9,6 +9,9 @@ extends Node
 
 const SPEED := 4.0
 const ROTATION_SPEED := 10.0
+const STUCK_VELOCITY_MIN := 0.5   # m/s — below this we're already stopping
+const STUCK_MOVE_MIN    := 0.01   # m   — less than this counts as no progress
+const STUCK_TIME_MAX    := 0.4    # s   — cancel nav after being stuck this long
 
 ## Normalized locomotion state in [0, 1] (0 = idle, 1 = walking at full SPEED).
 ## Computed here (server-authoritative) and replicated by player.gd alongside
@@ -32,6 +35,7 @@ var _rng := RandomNumberGenerator.new()
 ## enemy_controller._is_player_valid).
 var _attack_target = null
 var _attack_timer: float = 0.0
+var _stuck_timer: float = 0.0
 
 
 func _ready() -> void:
@@ -82,8 +86,19 @@ func _walk_path(delta: float) -> void:
 		_body.global_transform.basis = _body.global_transform.basis.slerp(target_basis, ROTATION_SPEED * delta)
 	else:
 		_body.velocity = Vector3.ZERO
+	var pre_speed := _body.velocity.length()
+	var before_pos := _body.global_position
 	_body.move_and_slide()
 	move_blend = clampf(_body.velocity.length() / SPEED, 0.0, 1.0)
+	# Stuck detection: velocity was set but the slide produced no movement.
+	if pre_speed > STUCK_VELOCITY_MIN \
+			and before_pos.distance_to(_body.global_position) < STUCK_MOVE_MIN:
+		_stuck_timer += delta
+		if _stuck_timer >= STUCK_TIME_MAX:
+			_agent.target_position = _body.global_position
+			_stuck_timer = 0.0
+	else:
+		_stuck_timer = 0.0
 
 
 ## Miniature of enemy_controller's AGGRO->ATTACK: outside weapon range chase
@@ -153,7 +168,12 @@ func move_to(destination: Vector3) -> void:
 	if _stats.hp <= 0:
 		return
 	_attack_target = null
-	_agent.target_position = destination
+	var map := _agent.get_navigation_map()
+	var snapped := NavigationServer3D.map_get_closest_point(map, destination)
+	_agent.target_position = snapped
+	if OS.has_environment("DEBUG_CLICK"):
+		print("[MOVE] dest_raw=%s dest_snapped=%s delta=%.3f" % [
+			str(destination), str(snapped), destination.distance_to(snapped)])
 
 
 ## Called by player.gd on respawn: teleports the body to `position` and

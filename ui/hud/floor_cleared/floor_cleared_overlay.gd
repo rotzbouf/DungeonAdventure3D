@@ -11,8 +11,8 @@ const FADE_OUT_TIME := 1.0
 @onready var _label: Label = $Label
 
 
-func show_overlay(xp_reward: int) -> void:
-	_label.text = "Floor Cleared!\n+%d XP" % xp_reward
+func show_overlay(xp_reward: int, new_floor: int) -> void:
+	_label.text = "Floor Cleared!\n+%d XP\nEntering Floor %d" % [xp_reward, new_floor]
 	modulate.a = 1.0
 	var tween := create_tween()
 	tween.tween_interval(HOLD_TIME)
