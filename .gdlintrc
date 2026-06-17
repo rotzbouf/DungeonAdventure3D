@@ -1,7 +1,8 @@
-[gdlint]
-# Naming conventions and logic checks are enforced.
-# Line length is generous — long @rpc declarations and multi-param function
-# signatures are idiomatic in this codebase and not worth splitting.
-max-line-length = 200
-max-public-methods = 30
-max-file-lines = 1200
+max-line-length: 200
+max-public-methods: 30
+max-file-lines: 1200
+disable:
+  - class-definitions-order   # enforces strict signal→const→var→func ordering;
+                               # this codebase groups related declarations instead
+  - load-constant-name        # rejects underscore-prefixed preload constants
+                               # (_DungeonState etc.) which are valid private-by-convention
