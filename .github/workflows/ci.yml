@@ -89,7 +89,7 @@ jobs:
           ./godot --headless --path . --export-release "${{ matrix.preset }}" 2>&1
 
       - name: Upload artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: ${{ matrix.artifact }}
           path: ${{ matrix.path }}
