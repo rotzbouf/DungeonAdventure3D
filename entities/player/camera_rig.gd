@@ -6,7 +6,7 @@ extends Node3D
 ## player.gd._ready(), which calls set_active() only for the owning client.
 
 const BOOM_OFFSET := Vector3(0.0, 12.0, 9.0)
-const FOLLOW_LERP_SPEED := 6.0
+const FOLLOW_LERP_SPEED := 10.0
 
 # Per-physics-tick target movement above this is a teleport (death respawn,
 # portal use), not normal locomotion (SPEED = 4.0 units/sec) — snap instantly

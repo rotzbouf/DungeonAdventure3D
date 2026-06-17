@@ -6,6 +6,24 @@ project uses [Semantic Versioning](https://semver.org/) (`MAJOR.MINOR.PATCH`).
 
 ## [Unreleased]
 
+## [0.19.2] - 2026-06-17
+
+### Added
+- Click destination indicator: a green glowing torus ring pulses at the
+  clicked floor point and disappears in ~0.45 s. Client-local only — never
+  replicated, never visible to other players.
+
+### Changed
+- Camera follow speed increased (`FOLLOW_LERP_SPEED` 6.0 → 10.0): the boom
+  camera feels "glued" to the player rather than floating behind them.
+- Player movement speed increased (`SPEED` 4.0 → 5.0 m/s): crossing the
+  town plaza or dungeon rooms is ~25% faster.
+- Stuck recovery is now 0.2 s (was 0.4 s): characters wedged against a
+  navmesh corner un-wedge in half the time.
+- Walk animation playback speed now scales with `move_blend` (range 0.6–1.0)
+  so the foot cycle slows proportionally as the character decelerates —
+  eliminates the "moonwalk" at near-stop.
+
 ## [0.19.1] - 2026-06-16
 
 ### Fixed

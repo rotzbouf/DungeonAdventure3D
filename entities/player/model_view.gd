@@ -60,6 +60,7 @@ func _ready() -> void:
 func _process(delta: float) -> void:
 	if _animation_tree != null:
 		_animation_tree[BLEND_PARAM] = _controller.move_blend
+		_animation_tree.speed_scale = lerpf(0.6, 1.0, _controller.move_blend)
 
 	if _controller.move_blend > MOVE_BLEND_THRESHOLD:
 		_footstep_timer += delta

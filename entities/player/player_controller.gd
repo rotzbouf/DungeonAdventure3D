@@ -7,11 +7,11 @@ extends Node
 ## via MultiplayerSynchronizer. This node's multiplayer authority is always the
 ## server (1) — set by player.gd._ready().
 
-const SPEED := 4.0
+const SPEED := 5.0
 const ROTATION_SPEED := 10.0
 const STUCK_VELOCITY_MIN := 0.5   # m/s — below this we're already stopping
 const STUCK_MOVE_MIN    := 0.01   # m   — less than this counts as no progress
-const STUCK_TIME_MAX    := 0.4    # s   — cancel nav after being stuck this long
+const STUCK_TIME_MAX    := 0.2    # s   — cancel nav after being stuck this long
 
 ## Normalized locomotion state in [0, 1] (0 = idle, 1 = walking at full SPEED).
 ## Computed here (server-authoritative) and replicated by player.gd alongside

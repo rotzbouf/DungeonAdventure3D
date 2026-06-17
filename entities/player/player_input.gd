@@ -12,6 +12,7 @@ extends Node
 ## character, then delegate to the authoritative controller.
 
 const RAY_LENGTH := 1000.0
+const CLICK_INDICATOR := preload("res://entities/player/click_indicator.tscn")
 
 var _active: bool = false
 
@@ -59,6 +60,11 @@ func _handle_click(screen_position: Vector2) -> void:
 	else:
 		destination = result.position
 	request_move_to.rpc_id(1, destination)
+	var world := get_tree().root.find_child("World", true, false)
+	if world != null:
+		var indicator := CLICK_INDICATOR.instantiate()
+		world.add_child(indicator)
+		indicator.global_position = destination + Vector3(0, 0.02, 0)
 
 
 func _is_wall_collider(collider: Node) -> bool:
