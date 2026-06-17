@@ -1,0 +1,88 @@
+name: CI
+
+on:
+  push:
+    branches: [master, main]
+  pull_request:
+    branches: [master, main]
+  workflow_dispatch:
+
+env:
+  GODOT_VERSION: "4.6.3"
+  GODOT_RELEASE: "stable"
+
+jobs:
+  # ── Validate ────────────────────────────────────────────────────────────────
+  # Fast check on every push/PR: imports the project headless and catches
+  # broken scripts, missing resources, and parse errors.
+  validate:
+    name: Validate (import check)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download Godot ${{ env.GODOT_VERSION }}
+        run: |
+          wget -q "https://github.com/godotengine/godot/releases/download/${{ env.GODOT_VERSION }}-${{ env.GODOT_RELEASE }}/Godot_v${{ env.GODOT_VERSION }}-${{ env.GODOT_RELEASE }}_linux.x86_64.zip" -O godot.zip
+          unzip -q godot.zip
+          mv "Godot_v${{ env.GODOT_VERSION }}-${{ env.GODOT_RELEASE }}_linux.x86_64" godot
+          chmod +x godot
+
+      - name: Import project
+        run: ./godot --headless --path . --import 2>&1 | tee import.log; exit ${PIPESTATUS[0]}
+
+      - name: Check for errors
+        run: |
+          if grep -iE "^ERROR:|script.*error|parse error|cannot open" import.log; then
+            echo "Errors found during import"
+            exit 1
+          fi
+          echo "Import clean"
+
+  # ── Export ──────────────────────────────────────────────────────────────────
+  # Builds Linux client and headless server binaries.
+  # Runs on push to master and on manual dispatch.
+  export:
+    name: Export (${{ matrix.preset }})
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    strategy:
+      matrix:
+        include:
+          - preset: Linux
+            artifact: linux-client
+            path: builds/linux/
+          - preset: Linux Server
+            artifact: linux-server
+            path: builds/server/
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download Godot ${{ env.GODOT_VERSION }}
+        run: |
+          wget -q "https://github.com/godotengine/godot/releases/download/${{ env.GODOT_VERSION }}-${{ env.GODOT_RELEASE }}/Godot_v${{ env.GODOT_VERSION }}-${{ env.GODOT_RELEASE }}_linux.x86_64.zip" -O godot.zip
+          unzip -q godot.zip
+          mv "Godot_v${{ env.GODOT_VERSION }}-${{ env.GODOT_RELEASE }}_linux.x86_64" godot
+          chmod +x godot
+
+      - name: Download export templates
+        run: |
+          mkdir -p ~/.local/share/godot/export_templates/${{ env.GODOT_VERSION }}.${{ env.GODOT_RELEASE }}
+          wget -q "https://github.com/godotengine/godot/releases/download/${{ env.GODOT_VERSION }}-${{ env.GODOT_RELEASE }}/Godot_v${{ env.GODOT_VERSION }}-${{ env.GODOT_RELEASE }}_export_templates.tpz" -O templates.tpz
+          unzip -q templates.tpz
+          mv templates/* ~/.local/share/godot/export_templates/${{ env.GODOT_VERSION }}.${{ env.GODOT_RELEASE }}/
+
+      - name: Import project
+        run: ./godot --headless --path . --import 2>&1
+
+      - name: Export "${{ matrix.preset }}"
+        run: |
+          mkdir -p ${{ matrix.path }}
+          ./godot --headless --path . --export-release "${{ matrix.preset }}" 2>&1
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}
+          path: ${{ matrix.path }}
+          retention-days: 14
