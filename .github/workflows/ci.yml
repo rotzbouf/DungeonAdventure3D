@@ -40,8 +40,9 @@ jobs:
           echo "Import clean"
 
   # ── Export ──────────────────────────────────────────────────────────────────
-  # Builds Linux client and headless server binaries.
-  # Runs on push to master and on manual dispatch.
+  # Builds client binaries for Linux, Windows, macOS, and the headless server.
+  # All jobs use the Linux Godot binary (cross-compile). Runs on push to master
+  # and on manual dispatch.
   export:
     name: Export (${{ matrix.preset }})
     runs-on: ubuntu-latest
@@ -55,6 +56,12 @@ jobs:
           - preset: Linux Server
             artifact: linux-server
             path: builds/server/
+          - preset: Windows
+            artifact: windows-client
+            path: builds/windows/
+          - preset: macOS
+            artifact: macos-client
+            path: builds/macos/
     steps:
       - uses: actions/checkout@v4
 

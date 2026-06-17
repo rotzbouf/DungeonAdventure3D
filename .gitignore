@@ -13,6 +13,8 @@ MyAssets/
 builds/**/*.x86_64
 builds/**/*.exe
 builds/**/*.pck
+builds/**/*.zip
+builds/**/*.dmg
 
 # OS cruft
 .DS_Store
