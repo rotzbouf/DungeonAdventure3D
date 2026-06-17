@@ -1,0 +1,7 @@
+[gdlint]
+# Naming conventions and logic checks are enforced.
+# Line length is generous — long @rpc declarations and multi-param function
+# signatures are idiomatic in this codebase and not worth splitting.
+max-line-length = 200
+max-public-methods = 30
+max-file-lines = 1200

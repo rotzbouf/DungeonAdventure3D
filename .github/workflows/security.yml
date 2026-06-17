@@ -1,0 +1,32 @@
+name: Security
+
+on:
+  push:
+    branches: [master, main]
+  pull_request:
+    branches: [master, main]
+  schedule:
+    - cron: "0 6 * * 1"  # Weekly Monday 06:00 UTC
+
+jobs:
+  secrets:
+    name: Secret scan (gitleaks)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # full history so gitleaks can scan all commits
+
+      - name: Install gitleaks
+        run: |
+          gh release download \
+            --repo gitleaks/gitleaks \
+            --pattern "gitleaks_*_linux_x64.tar.gz" \
+            --output gitleaks.tar.gz
+          tar -xf gitleaks.tar.gz gitleaks
+          chmod +x gitleaks
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Scan for secrets
+        run: ./gitleaks detect --source . --verbose --redact
